@@ -36,10 +36,11 @@ import 'package:arabic_learning/funcs/utili.dart';
 /// List<List<String>> value = await popSelectClasses(context);
 /// List<Map<String, dynamic>> words = getSelectedWords(context , forceSelectClasses: value);
 /// ```
-Future<ClassSelection> popSelectClasses(BuildContext context, {bool withCache = false, bool withReviewChoose = true}) async {
+Future<ClassSelection> popSelectClasses(BuildContext context, {bool withCache = false, bool withReviewChoose = true, List<SourceItem>? forceSelectRange}) async {
   context.read<Global>().uiLogger.info("弹出课程选择（ClassSelectPage），withCache: $withCache");
   final List<ClassItem> beforeSelectedClasses = [];
   if(withCache) {
+    if(forceSelectRange != null) throw Exception("popSelectClasses不允许forceSelectRange时使用withCache");
     final String tpcPrefs = context.read<Global>().prefs.getString("tempConfig") ?? jsonEncode(StaticsVar.tempConfig);
     final List<List<String>> cacheList = (jsonDecode(tpcPrefs)["SelectedClasses"] as List)
         .cast<List>()
@@ -92,9 +93,14 @@ Future<ClassSelection> popSelectClasses(BuildContext context, {bool withCache = 
 /// [isClassSelected] :需要一个函数判断该课程是否被选中
 /// 
 /// 一般情况下该函数只会在 [ClassSelectPage] 中被使用，若非必要你不应该使用此函数
-List<Widget> classesSelectionList(BuildContext context, Function (ClassItem) onChanged, bool Function (ClassItem) isClassSelected) {
+List<Widget> classesSelectionList(BuildContext context, Function (ClassItem) onChanged, bool Function (ClassItem) isClassSelected, List<SourceItem>? forceSelectRange) {
   context.read<Global>().uiLogger.fine("构建课程选择列表");
-  List<SourceItem> sourcesList = context.read<Global>().wordData.classes;
+  late List<SourceItem> sourcesList;
+  if(forceSelectRange != null) {
+    sourcesList = forceSelectRange;
+  } else {
+    sourcesList = context.read<Global>().wordData.classes;
+  }
   List<Widget> widgetList = [];
   for (SourceItem source in sourcesList) {
     widgetList.add(
@@ -613,14 +619,15 @@ class WordCard extends StatelessWidget {
 class ClassSelectPage extends StatelessWidget { 
   final List<ClassItem> beforeSelectedClasses;
   final bool withReviewChoose;
-  const ClassSelectPage({super.key, this.beforeSelectedClasses = const [], this.withReviewChoose = false});
+  final List<SourceItem>? forceSelectRange;
+  const ClassSelectPage({super.key, this.beforeSelectedClasses = const [], this.withReviewChoose = false, this.forceSelectRange});
   @override
   Widget build(BuildContext context) {
     final MediaQueryData mediaQuery = MediaQuery.of(context);
     ClassSelection classSelection = ClassSelection(
       selectedClass: beforeSelectedClasses.toList(), 
       countInReview: context.read<Global>().globalFSRS.config.enabled
-      );
+    );
     void addClass(ClassItem classInfo) {
       classSelection.selectedClass.add(classInfo);
     }
@@ -646,7 +653,7 @@ class ClassSelectPage extends StatelessWidget {
         children: [
           Expanded(
             child: ListView(
-              children: classesSelectionList(context, onClassChanged, isClassSelected)
+              children: classesSelectionList(context, onClassChanged, isClassSelected, forceSelectRange)
             ),
           ),
           if(withReviewChoose) StatefulBuilder(

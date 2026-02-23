@@ -33,7 +33,7 @@ class TestPage extends StatelessWidget {
               context, 
               MaterialPageRoute(
                 builder: (context) => ChangeNotifierProvider(
-                  create: (context) => PKServer(),
+                  create: (context) => PKServer()..init(context.read<Global>()),
                   child: LocalPKSelectPage()
                 )
               )

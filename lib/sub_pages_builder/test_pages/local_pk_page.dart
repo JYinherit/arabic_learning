@@ -1,4 +1,5 @@
 import 'package:arabic_learning/funcs/local_pk_server.dart';
+import 'package:arabic_learning/funcs/ui.dart';
 import 'package:arabic_learning/vars/statics_var.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -12,7 +13,8 @@ class LocalPKSelectPage extends StatefulWidget {
 }
 class _LocalPKSelectPage extends State<LocalPKSelectPage> {
   final TextEditingController connectpwdController = TextEditingController();
-  
+  bool isconnecting = false;
+
   @override
   Widget build(BuildContext context) {
     MediaQueryData mediaQuery = MediaQuery.of(context);
@@ -56,16 +58,26 @@ class _LocalPKSelectPage extends State<LocalPKSelectPage> {
                 borderSide: BorderSide(color: Theme.of(context).colorScheme.outline),
               ),
               suffix: ElevatedButton(
-                onPressed: () {
-                  // TODO
+                onPressed: () async {
+                  if(isconnecting) return;
+                  setState(() {
+                    isconnecting = true;
+                  });
+                  int statue = await context.read<PKServer>().testConnect(connectpwdController.text);
                 }, 
                 child: Text("加入")
               ),
             ),
-            onSubmitted: (text) {
-              // TODO
+            onSubmitted: (text) async {
+              if(isconnecting) return;
+              setState(() {
+                isconnecting = true;
+              });
+              int statue = await context.read<PKServer>().testConnect(text);
             },
           ),
+          SizedBox(height: mediaQuery.size.height * 0.1),
+          if(isconnecting) CircularProgressIndicator()
         ],
       ),
     );
@@ -83,15 +95,36 @@ class _ServerHostWatingPage extends State<ServerHostWatingPage> {
   @override
   Widget build(BuildContext context) {
     MediaQueryData mediaQuery = MediaQuery.of(context);
-    return FutureBuilder(
-      future: context.read<PKServer>().start(), 
+    return context.watch<PKServer>().connected 
+    ? Scaffold(
+      appBar: AppBar(title: Text("连接成功")),
+      body: Center(
+        child: Column(
+          children: [
+            SizedBox(height: mediaQuery.size.height * 0.1),
+            TextContainer(text: "你们双方有一下共有词库，请选择其中的课程开始", style: Theme.of(context).textTheme.headlineMedium),
+            SizedBox(height: mediaQuery.size.height * 0.05),
+            ...List.generate(context.read<PKServer>().selectableSource.length, (int index) => Text(context.read<PKServer>().selectableSource[index].sourceJsonFileName), growable: false),
+            SizedBox(height: mediaQuery.size.height * 0.1),
+            ElevatedButton(
+              onPressed: (){
+                popSelectClasses(context, forceSelectRange: context.read<PKServer>().selectableSource);
+              }, 
+              child: Text("开始选课")
+            )
+          ],
+        ),
+      ),
+    )
+    : FutureBuilder(
+      future: context.read<PKServer>().startHost(), 
       initialData: false,
       builder: (context, snapshot) {
         return Scaffold(
-          appBar: AppBar(title: Text(snapshot.data??false ? "等待其他人进入" : "正在启动服务")),
+          appBar: AppBar(title: Text(snapshot.data??false ? "等待其他人进入..." : "正在启动服务")),
           body: Center(
             child: snapshot.data??false
-                  ? Text("联机口令: ${context.read<PKServer>().connectpwd}")
+                  ? Text("联机口令: ${context.read<PKServer>().connectpwd}", style: Theme.of(context).textTheme.displayMedium)
                   : CircularProgressIndicator(semanticsLabel: "服务加载中")
           ),
         );

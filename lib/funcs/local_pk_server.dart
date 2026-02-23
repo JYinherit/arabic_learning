@@ -2,19 +2,27 @@ import 'dart:io' show HttpServer;
 import 'dart:math';
 import 'dart:convert';
 import 'dart:typed_data' show Uint8List;
+import 'package:arabic_learning/vars/config_structure.dart';
+import 'package:arabic_learning/vars/global.dart';
+import 'package:logging/logging.dart';
 import 'package:network_info_plus/network_info_plus.dart';
 import 'package:arabic_learning/vars/statics_var.dart';
 import 'package:flutter/foundation.dart' show ChangeNotifier;
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as io;
 import 'package:shelf_router/shelf_router.dart';
+import 'package:dio/dio.dart' as dio;
 
 class PKServer with ChangeNotifier{
 
   bool started = false;
+  bool connected = false;
+  final Logger logger = Logger("PKServer");
   late final HttpServer _server;
   late final int _port;
   late final String? _localIP;
+  List<SourceItem> selectableSource = [];
+  late Global global;
   final NetworkInfo _networkInfo = NetworkInfo();
 
   String? get connectpwd {
@@ -30,10 +38,15 @@ class PKServer with ChangeNotifier{
     return base64Encode(bytes).replaceAll("=", "");
   }
 
-  Future<bool> start() async {
-    if(started) return true;
+  Future<void> init(Global outerglobal) async {
+    _localIP = await _networkInfo.getWifiIP();
+    global = outerglobal;
+  }
 
+  Future<bool> startHost() async {
+    if(started) return true;
     _port = Random().nextInt(55535)+10000;
+    logger.fine("正在启动服务，随机端口: $_port");
     final router = Router();
 
     router.get('/api/check', (Request req) {
@@ -43,9 +56,21 @@ class PKServer with ChangeNotifier{
       );
     });
 
-    router.post('/api/exchangeDictSum', (Request req) async {
-      final body = await req.readAsString();
-      return Response.ok('{"received": "$body"}');
+    router.post('/api/testDictSum', (Request req) async {
+      Map<String, dynamic> body = json.decode(await req.readAsString());
+      // {
+      //  "dictSum": ["SHA256", ...]
+      // }
+      List sumList = body["dictSum"];
+      selectableSource.clear();
+      for(SourceItem source in global.wordData.classes) {
+        if(sumList.contains(source.getHash())) selectableSource.add(source);
+      }
+      if(selectableSource.isNotEmpty) connected = true;
+      return Response.ok(json.encode({
+        "accept": selectableSource.isNotEmpty,
+        "allowed": List<String>.generate(selectableSource.length, (int index) => selectableSource[index].getHash(), growable: false)
+      }));
     });
 
     _server = await io.serve(
@@ -54,13 +79,76 @@ class PKServer with ChangeNotifier{
       _port,
     );
 
-    _localIP = await _networkInfo.getWifiIP();
-
+    logger.fine("服务端已启动");
     started = true;
     return true;
   }
 
-  Future<void> stop() async {
+  Future<void> stopHost() async {
     await _server.close();
+    logger.info("服务端已关闭");
+  }
+
+  List<int>? decodeConnectPwd(String connectpwd){
+    logger.info("尝试解码$connectpwd");
+    while (connectpwd.length == 7) {
+      connectpwd = "$connectpwd=";
+    }
+    late Uint8List tmp;
+    try{
+      tmp = base64Decode(connectpwd);
+    } catch (e) {
+      logger.warning("解码错误");
+      return null;
+    }
+    
+    if(tmp.length != 5){
+      logger.warning("解码错误");
+      return null;
+    }
+    int comb = (tmp[0] << 32) | (tmp[1] << 24) | (tmp[2] << 16) | (tmp[3] << 8) | tmp[4];
+    int port = comb & 0xFFFF;
+    int iphex= comb >> 16;
+    return [(iphex >> 16) & 0xFF, (iphex >> 8 & 0xFF), iphex & 0xFF, port];
+  }
+
+  Future<int> testConnect(String connectpwd) async {
+    List<int>? addressinfo = decodeConnectPwd(connectpwd);
+    if(addressinfo == null) {
+      logger.severe("联机口令解析失败，终止连接");
+      return 1;
+    }
+    final String address = "http://${_localIP!.split(".")[0]}.${addressinfo[0]}.${addressinfo[1]}.${addressinfo[2]}:${addressinfo[3]}";
+    final dio.Dio client = dio.Dio();
+    final checkRes = await client.get("$address/api/check");
+    if(checkRes.statusCode != 200) {
+      logger.severe("连接服务端失败");
+      return 2;
+    }
+    if(checkRes.data["version"] != StaticsVar.appVersion) {
+      logger.severe("版本校验不通过，对方版本为: ${checkRes.data["version"]}，我方为${StaticsVar.appVersion}");
+      return 3;
+    }
+    final dictRes = await client.post(
+      "$address/api/testDictSum", 
+      data: {
+        "dictSum": List<String>.generate(global.wordData.classes.length, (int index) => global.wordData.classes[index].getHash(), growable: false)
+      }
+    );
+    if(dictRes.statusCode != 200) {
+      logger.severe("连接服务端失败");
+      return 2;
+    }
+    if(!json.decode(dictRes.data)["accept"]) {
+      logger.severe("本地与服务端无可使用的相同词库");
+      return 4;
+    }
+    selectableSource.clear();
+    List remoteDict = json.decode(dictRes.data)["allowed"];
+    for(SourceItem source in global.wordData.classes) {
+      if(remoteDict.contains(source.getHash())) selectableSource.add(source);
+    }
+    connected = true;
+    return 0;
   }
 }

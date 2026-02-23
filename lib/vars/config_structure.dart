@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:crypto/crypto.dart';
 import 'package:arabic_learning/vars/statics_var.dart' show StaticsVar;
 import 'package:flutter/foundation.dart' show immutable;
 
@@ -693,6 +694,10 @@ class SourceItem {
       classesMap[classItem.className] = classItem.wordIndexs;
     }
     return classesMap;
+  }
+
+  String getHash() {
+    return sha256.convert(utf8.encode(toMap().toString())).toString();
   }
 }
 
