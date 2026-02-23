@@ -81,12 +81,12 @@ class _DataSyncPage extends State<DataSyncPage> {
                         return Row(
                           children: [
                             Icon(Icons.circle, color: Colors.redAccent, size: 18),
-                            Text("在测试中遇到了未知的异常", style: TextStyle(fontSize: 8))
+                            Text("在测试中遇到了未知的异常", style: Theme.of(context).textTheme.labelSmall)
                           ],
                         );
                       }
                       if(snapshot.connectionState == ConnectionState.waiting) {
-                        return CircularProgressIndicator();
+                        return CircularProgressIndicator(constraints: BoxConstraints(minHeight: 18, minWidth: 18), strokeWidth: 2);
                       }
                       if(snapshot.hasData) {
                         return Row(
