@@ -696,8 +696,19 @@ class SourceItem {
     return classesMap;
   }
 
-  String getHash() {
-    return sha256.convert(utf8.encode(toMap().toString())).toString();
+  Map<String, List<Map>> toComparableMap(List<WordItem> words) {
+    Map<String, List<Map<String, String>>> classesMap = {};
+    for(ClassItem classItem in subClasses) {
+      classesMap[classItem.className] = [];
+      for(int index in classItem.wordIndexs) {
+        classesMap[classItem.className]!.add(words[index].toMap());
+      }
+    }
+    return classesMap;
+  }
+
+  String getHash(List<WordItem> words) {
+    return sha256.convert(utf8.encode(toComparableMap(words).toString())).toString();
   }
 }
 
@@ -714,6 +725,10 @@ class ClassItem {
   @override
   String toString() {
     return className;
+  }
+
+  String getHash() {
+    return sha256.convert(utf8.encode(toString())).toString();
   }
 }
 
