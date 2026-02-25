@@ -309,13 +309,18 @@ class _PKPreparePage extends State<PKPreparePage> {
                       context.watch<PKServer>().preparedP1
                       ? Text("已准备")
                       : ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          fixedSize: Size.fromHeight(mediaQuery.size.height * 0.1),
+                          shape: RoundedRectangleBorder(borderRadius: StaticsVar.br)
+                        ),
                         onPressed: (){
                           setState(() {
                             context.read<PKServer>().preparedP1 = true;
                           });
                         }, 
                         child: Text("准备")
-                      )
+                      ),
+                      if(context.watch<PKServer>().preparedP1) Icon(Icons.done, color: Colors.greenAccent, size: 36)
                     ],
                   ),
                 ),
@@ -331,7 +336,8 @@ class _PKPreparePage extends State<PKPreparePage> {
                     children: [
                       Text("对方", style: Theme.of(context).textTheme.headlineSmall),
                       SizedBox(height: mediaQuery.size.height * 0.05),
-                      Text("${context.watch<PKServer>().preparedP2 ? "已" : "未"}准备")
+                      Text("${context.watch<PKServer>().preparedP2 ? "已" : "未"}准备"),
+                      if(context.watch<PKServer>().preparedP2) Icon(Icons.done, color: Colors.greenAccent, size: 36)
                     ],
                   ),
                 )
