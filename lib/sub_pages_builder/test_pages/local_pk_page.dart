@@ -1,7 +1,7 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math';
 
-import 'package:arabic_learning/funcs/local_pk_server.dart';
 import 'package:arabic_learning/funcs/ui.dart';
 import 'package:arabic_learning/funcs/utili.dart';
 import 'package:arabic_learning/vars/config_structure.dart';
@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
+import 'package:arabic_learning/package_replacement/fake_local_pk_server.dart' if (dart.library.io) 'package:arabic_learning/funcs/local_pk_server.dart';
 
 
 class LocalPKSelectPage extends StatefulWidget {
@@ -116,7 +117,7 @@ class _LocalPKSelectPage extends State<LocalPKSelectPage> {
             },
           ),
           SizedBox(height: mediaQuery.size.height * 0.02),
-          ElevatedButton.icon(
+          if(Platform.isAndroid) ElevatedButton.icon(
             onPressed: () {
               if(isScaning) scannerController.stop();
               setState(() {
@@ -425,7 +426,7 @@ class _PKOngoingPage extends State<PKOngoingPage> {
                   physics: NeverScrollableScrollPhysics(),
                   itemBuilder: (context, index) {
                     if(index == context.read<PKServer>().pkState.testWords.length) {
-                      context.read<PKServer>().pkState.selfTookenTime = DateTime.now().difference(context.read<PKServer>().startTime!).inSeconds;
+                      context.read<PKServer>().pkState.selfTookenTime ??= DateTime.now().difference(context.read<PKServer>().startTime!).inSeconds;
                       if(context.read<PKServer>().pkState.sideTookenTime == null) {
                         return Center(
                           child: Text("等待对方完成中...", style: Theme.of(context).textTheme.headlineSmall),

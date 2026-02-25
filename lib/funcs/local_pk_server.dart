@@ -172,7 +172,7 @@ class PKServer with ChangeNotifier{
         changed = true;
       }
       if(pkState.sideProgress.length == pkState.testWords.length && body["tooken"] != null) {
-        pkState.sideTookenTime = body["tooken"] - (delay!.inMilliseconds/1000).round();
+        pkState.sideTookenTime = body["tooken"];
         logger.fine("已更新本地PKState.sideTookenTime");
         changed = true;
       }
