@@ -159,7 +159,7 @@ Future<void> shiftToStudy(BuildContext context) async {
   context.read<Global>().uiLogger.info("准备转向学习页面");
   final ClassSelection classSelection = await popSelectClasses(context, withCache: false, withReviewChoose: true);
   if(classSelection.selectedClass.isEmpty || !context.mounted) return;
-  final List<WordItem> words = getSelectedWords(context, doShuffle: false, doDouble: false, forceSelectClasses: classSelection.selectedClass);
+  final List<WordItem> words = getSelectedWords(context.read<Global>().wordData, classSelection.selectedClass, doShuffle: false, doDouble: false);
   context.read<Global>().uiLogger.info("完成单词挑拣，共${words.length}个");
   if(words.isEmpty) return;
   context.read<Global>().uiLogger.info("跳转: LearningPage => InLearningPage");

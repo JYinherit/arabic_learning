@@ -2,6 +2,7 @@ import 'dart:io' show HttpServer;
 import 'dart:math';
 import 'dart:convert';
 import 'dart:typed_data' show Uint8List;
+import 'package:arabic_learning/funcs/utili.dart';
 import 'package:arabic_learning/vars/config_structure.dart';
 import 'package:arabic_learning/vars/global.dart';
 import 'package:logging/logging.dart';
@@ -24,9 +25,14 @@ class PKServer with ChangeNotifier{
   ClassSelection? classSelection;
   late Global global;
   final NetworkInfo _networkInfo = NetworkInfo();
+  DateTime? startTime;
+  bool preparedP1 = false;
+  bool preparedP2 = false;
+  late final PKState pkState;
 
   // server
   bool started = false;
+  Duration? delay;
   late final HttpServer _server;
   late final int _port;
 
@@ -101,6 +107,61 @@ class PKServer with ChangeNotifier{
         ),
         headers: {'Content-Type': 'application/json'},
       );
+    });
+
+    router.post('/api/prepare', (Request req) async {
+      Map<String, dynamic> body = json.decode(await req.readAsString());
+      if(body["time"] != null && delay == null) {
+        delay = DateTime.tryParse(body["time"])!.difference(DateTime.now());
+      }
+      if(body["prepared"]) {
+        preparedP2 = true;
+        if(preparedP1 && startTime == null) {
+          startTime = DateTime.now().add(Duration(seconds: 5));
+          pkState = PKState(
+            testWords: getSelectedWords(global.wordData, classSelection!.selectedClass, doShuffle: true, shuffleSeed: rndSeed), 
+            selfProgress: [], 
+            sideProgress: []
+          );
+        }
+        notifyListeners();
+      }
+      
+      
+      return Response.ok(json.encode({
+        "prepared": preparedP1,
+        "start": startTime?.add(delay!).toIso8601String()
+        }),
+        headers: {'Content-Type': 'application/json'}
+      );
+    });
+
+    router.post('/api/sync', (Request req) async {
+      Map<String, dynamic> body = json.decode(await req.readAsString());
+      bool changed = false;
+      if(body["progress"] != null && body["progress"].length != pkState.sideProgress.length) {
+        pkState.sideProgress = List.generate(body["progress"].length, (int index) => body["progress"][index] as bool);
+        changed = true;
+      }
+      if(pkState.sideProgress.length == pkState.testWords.length && body["tooken"] != null) {
+        pkState.sideTookenTime = body["tooken"] - delay!.inSeconds;
+        changed = true;
+      }
+      if(changed) notifyListeners();
+      return Response.ok(json.encode({
+        "progress": pkState.selfProgress,
+        "tooken": pkState.selfTookenTime
+        }),
+        headers: {'Content-Type': 'application/json'}
+      );
+    });
+
+    router.get('/api/done', (Request req) async {
+      Future.delayed(Duration(seconds: 1), () {
+        stopHost();
+      });
+      notifyListeners();
+      return Response.ok(null);
     });
 
     _server = await io.serve(
@@ -210,4 +271,98 @@ class PKServer with ChangeNotifier{
     }
     return classSelection!;
   }
+
+  Future<void> watingPrepare() async {
+    while (!preparedP2 || startTime == null) {
+      try{
+        await Future.delayed(Duration(seconds: 1));
+        final prepareRes = await client.post(
+          "$serverAddress/api/prepare", 
+          data: {
+            "prepared": preparedP1,
+            "time": DateTime.now().toIso8601String()
+          }
+        );
+        if(prepareRes.statusCode != 200) throw Exception("Unexcepted statusCode: ${prepareRes.statusCode}");
+        bool changed = false;
+        if(preparedP2 != prepareRes.data["prepared"]) {
+          preparedP2 = prepareRes.data["prepared"];
+          changed = true;
+        }
+        if(preparedP1 && preparedP2 && prepareRes.data["start"] != null) {
+          startTime = DateTime.tryParse(prepareRes.data["start"]) as DateTime;
+          changed = true;
+        }
+        if(changed) notifyListeners();
+      } catch (e) {
+        logger.shout("连接服务端失败: $e");
+        rethrow;
+      }
+    }
+  }
+
+  void initPK() {
+    pkState = PKState(
+      testWords: getSelectedWords(global.wordData, classSelection!.selectedClass, doShuffle: true, shuffleSeed: rndSeed), 
+      selfProgress: [], 
+      sideProgress: []
+    );
+    syncPKState();
+  }
+
+  Future<void> syncPKState() async {
+    while(true) {
+      try{
+        await Future.delayed(Duration(milliseconds: 500));
+        final syncRes = await client.post(
+          "$serverAddress/api/sync",
+          data: {
+            "progress": pkState.selfProgress,
+            "tooken": pkState.selfTookenTime
+          },
+          options: dio.Options(connectTimeout: Duration(seconds: 1))
+        );
+        if(syncRes.statusCode != 200) throw Exception("Unexcepted statusCode: ${syncRes.statusCode}");
+        bool changed = false;
+        if(syncRes.data["progress"] != null && syncRes.data["progress"].length != pkState.sideProgress.length) {
+          pkState.sideProgress = List.generate(syncRes.data["progress"].length, (int index) => syncRes.data["progress"][index] as bool);
+          changed = true;
+        }
+        if(pkState.sideProgress.length == pkState.testWords.length && syncRes.data["tooken"] != null) {
+          pkState.sideTookenTime = syncRes.data["tooken"];
+          changed = true;
+        }
+        if(changed) notifyListeners();
+        if(pkState.selfTookenTime != null && pkState.sideTookenTime != null) {
+          client.get("$serverAddress/api/done");
+          break;
+        }
+      } catch (e) {
+        logger.shout("同步状态失败 $e");
+      }
+    }
+  }
+
+  void updateState(bool correct) {
+    pkState.selfProgress.add(correct);
+    notifyListeners();
+  }
+
+  double calculatePt(List<bool> progress, int tookenTime) {
+    int correctCount = 0;
+    for(bool value in progress) {
+      if(value) correctCount++;
+    }
+    return 750*(correctCount/progress.length) + 250 - tookenTime;
+  }
+}
+
+class PKState {
+  List<WordItem> testWords;
+  List<bool> selfProgress;
+  int? selfTookenTime;
+  List<bool> sideProgress;
+  int? sideTookenTime;
+
+  PKState({required this.testWords, required this.selfProgress, required this.sideProgress});
 }

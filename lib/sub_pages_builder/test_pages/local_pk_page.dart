@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:arabic_learning/funcs/local_pk_server.dart';
 import 'package:arabic_learning/funcs/ui.dart';
+import 'package:arabic_learning/funcs/utili.dart';
 import 'package:arabic_learning/vars/config_structure.dart';
+import 'package:arabic_learning/vars/global.dart';
 import 'package:arabic_learning/vars/statics_var.dart';
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -219,14 +222,8 @@ class _ServerHostWatingPage extends State<ServerHostWatingPage> {
   }
 }
 
-class ClientWatingPage extends StatefulWidget {
+class ClientWatingPage extends StatelessWidget {
   const ClientWatingPage({super.key});
-
-  @override
-  State<StatefulWidget> createState() => _ClientWatingPage();
-}
-
-class _ClientWatingPage extends State<ClientWatingPage> {
   
   @override
   Widget build(BuildContext context) {
@@ -250,13 +247,36 @@ class _ClientWatingPage extends State<ClientWatingPage> {
   }
 }
 
-class PKPreparePage extends StatelessWidget {
+class PKPreparePage extends StatefulWidget {
   const PKPreparePage({super.key});
+
+  @override
+  State<StatefulWidget> createState() => _PKPreparePage();
+}
+
+class _PKPreparePage extends State<PKPreparePage> {
+  bool watching = false;
+  bool downCount = false;
 
   @override
   Widget build(BuildContext context) {
     MediaQueryData mediaQuery = MediaQuery.of(context);
-
+    if(!watching && !context.read<PKServer>().started) context.read<PKServer>().watingPrepare();
+    if(context.read<PKServer>().startTime != null&&!downCount) {
+      downCount = true;
+      Future.delayed(context.read<PKServer>().startTime!.difference(DateTime.now()), () {
+        if(!context.mounted) return;
+        PKServer notifier = context.read<PKServer>();
+        Navigator.pop(context);
+        Navigator.push(
+          context, 
+          MaterialPageRoute(builder: (context) => ChangeNotifierProvider.value(
+            value: notifier,
+            child: PKOngoingPage(),
+          ))
+        );
+      });
+    }
     return Scaffold(
       appBar: AppBar(title: Text("请准备")),
       body: Center(
@@ -266,15 +286,369 @@ class PKPreparePage extends StatelessWidget {
             TextContainer(text: "已选择以下课程，准备完成后开始"),
             ...List.generate(context.read<PKServer>().classSelection!.selectedClass.length, (int index) => Text(context.read<PKServer>().classSelection!.selectedClass[index].className), growable: false),
             SizedBox(height: mediaQuery.size.height * 0.1),
-            ElevatedButton(
-              onPressed: (){
-                // TODO
-              }, 
-              child: Text("准备")
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              
+              children: [
+                Container(
+                  padding: EdgeInsets.all(8.0),
+                  height: mediaQuery.size.height * 0.3,
+                  width: mediaQuery.size.width * 0.4,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.onPrimary,
+                    borderRadius: StaticsVar.br
+                  ),
+                  child: Column(
+                    children: [
+                      Text("你", style: Theme.of(context).textTheme.headlineSmall),
+                      SizedBox(height: mediaQuery.size.height * 0.05),
+                      context.watch<PKServer>().preparedP1
+                      ? Text("已准备")
+                      : ElevatedButton(
+                        onPressed: (){
+                          setState(() {
+                            context.read<PKServer>().preparedP1 = true;
+                          });
+                        }, 
+                        child: Text("准备")
+                      )
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: EdgeInsets.all(8.0),
+                  height: mediaQuery.size.height * 0.3,
+                  width: mediaQuery.size.width * 0.4,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.onSecondary,
+                    borderRadius: StaticsVar.br
+                  ),
+                  child: Column(
+                    children: [
+                      Text("对方", style: Theme.of(context).textTheme.headlineSmall),
+                      SizedBox(height: mediaQuery.size.height * 0.05),
+                      Text("${context.watch<PKServer>().preparedP2 ? "已" : "未"}准备")
+                    ],
+                  ),
+                )
+              ],
+            ),
+            if(downCount) TweenAnimationBuilder<double>(
+              tween: Tween(
+                begin: 1,
+                end: 0
+              ), 
+              duration: context.read<PKServer>().startTime!.difference(DateTime.now()), 
+              builder: (context, value, child) => Column(
+                children: [
+                  CircularProgressIndicator(value: value),
+                  child!
+                ],
+              ),
+              child: Text("即将开始..."),
             )
           ],
         ),
       ),
+    );
+  }
+}
+
+class PKOngoingPage extends StatefulWidget {
+  const PKOngoingPage({super.key});
+
+  @override
+  State<StatefulWidget> createState() => _PKOngoingPage();
+}
+
+class _PKOngoingPage extends State<PKOngoingPage> {
+  int state = 0;
+  PageController pageController = PageController();
+  List<List<String>> choiceOptions = [];
+
+  @override
+  Widget build(BuildContext context) {
+    MediaQueryData mediaQuery = MediaQuery.of(context);
+
+    if(state == 0) {
+      if(!context.read<PKServer>().started) context.read<PKServer>().initPK();
+      Random rnd = Random(context.read<PKServer>().rndSeed);
+      for(WordItem wordItem in context.read<PKServer>().pkState.testWords) {
+        List<WordItem> optionWords = getRandomWords(4, context.read<Global>().wordData, allowRepet: false, include: wordItem, shuffle: true, rnd: rnd);
+        choiceOptions.add(List.generate(4, (int index) => optionWords[index].chinese));
+      }
+      state++;
+    }
+
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
+        appBar: AppBar(title: Text("局域网联机"), automaticallyImplyLeading: false),
+        body: Column(
+          children: [
+            TopScoreBar(state: context.watch<PKServer>().pkState),
+            Expanded(
+              child: SizedBox(
+                width: mediaQuery.size.width,
+                child: PageView.builder(
+                  controller: pageController,
+                  itemCount: context.read<PKServer>().pkState.testWords.length + 1,
+                  physics: NeverScrollableScrollPhysics(),
+                  itemBuilder: (context, index) {
+                    if(index == context.read<PKServer>().pkState.testWords.length) {
+                      context.read<PKServer>().pkState.selfTookenTime = DateTime.now().difference(context.read<PKServer>().startTime!).inSeconds;
+                      if(context.read<PKServer>().pkState.sideTookenTime == null) {
+                        return Center(
+                          child: Text("等待对方完成中...", style: Theme.of(context).textTheme.headlineSmall),
+                        );
+                      } else {
+                        int selfCorrect = 0;
+                        int sideCorrect = 0;
+                        for(int i = 0;i < context.read<PKServer>().pkState.testWords.length; i++) {
+                          if(context.read<PKServer>().pkState.sideProgress[i]) {
+                            sideCorrect++;
+                          }
+                          if (context.read<PKServer>().pkState.selfProgress[i]) {
+                            selfCorrect++;
+                          }
+                        }
+                        double selfPt = context.read<PKServer>().calculatePt(context.read<PKServer>().pkState.selfProgress, context.read<PKServer>().pkState.selfTookenTime!);
+                        double sidePt = context.read<PKServer>().calculatePt(context.read<PKServer>().pkState.sideProgress, context.read<PKServer>().pkState.sideTookenTime!);
+                        return PKConclue(
+                          selfCorrect: selfCorrect, 
+                          sideCorrect: sideCorrect, 
+                          selfPt: selfPt, 
+                          sidePt: sidePt
+                        );
+                      }
+                    }
+                    return ChoiceQuestions(
+                      mainWord: context.read<PKServer>().pkState.testWords[index].arabic, 
+                      choices: choiceOptions[index], 
+                      allowAudio: true, 
+                      allowAnitmation: false,
+                      onSelected: (int choosed) {
+                        pageController.nextPage(duration: Duration(milliseconds: 500), curve: StaticsVar.curve);
+                        if(choiceOptions[index][choosed] == context.read<PKServer>().pkState.testWords[index].chinese) {
+                          context.read<PKServer>().updateState(true);
+                          return true;
+                        } else {
+                          context.read<PKServer>().updateState(false);
+                          return false;
+                        }
+                      },
+                      allowMutipleSelect: false,
+                    );
+                  }
+                ),
+              ),
+            )
+          ],
+        )
+      ),
+    );
+  }
+}
+
+class PKConclue extends StatelessWidget {
+  const PKConclue({
+    super.key,
+    required this.selfCorrect,
+    required this.sideCorrect,
+    required this.selfPt,
+    required this.sidePt,
+  });
+
+  final int selfCorrect;
+  final int sideCorrect;
+  final double selfPt;
+  final double sidePt;
+
+  @override
+  Widget build(BuildContext context) {
+    MediaQueryData mediaQuery = MediaQuery.of(context);
+
+    return Column(
+      children: [
+        Text("回答正确数", style:Theme.of(context).textTheme.titleLarge),
+        TweenAnimationBuilder<double>(
+          tween: Tween(
+            begin: 0,
+            end: 1
+          ), 
+          curve: StaticsVar.curve,
+          duration: Duration(seconds: 1), 
+          builder: (context, value, child) {
+            return Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  padding: EdgeInsets.all(16.0),
+                  height: mediaQuery.size.height * 0.1,
+                  width: min(value*2, 1) * mediaQuery.size.width * (0.5 + 0.25*((selfCorrect - sideCorrect)/context.read<PKServer>().pkState.testWords.length)),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.onPrimary,
+                  ),
+                  child: Text("你  ${(value*selfCorrect).floor()}", style: Theme.of(context).textTheme.headlineMedium, textAlign: TextAlign.end),
+                ),
+                Container(
+                  padding: EdgeInsets.all(16.0),
+                  height: mediaQuery.size.height * 0.1,
+                  width: min(value*2, 1) * mediaQuery.size.width * (0.5 - 0.25*((selfCorrect - sideCorrect)/context.read<PKServer>().pkState.testWords.length)),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.onSecondary,
+                  ),
+                  child: Text("${(value*sideCorrect).floor()}  对方", style: Theme.of(context).textTheme.headlineMedium, textAlign: TextAlign.start),
+                ),
+              ],
+            );
+          }
+        ),
+        SizedBox(height: mediaQuery.size.height * 0.05),
+        Text("回答用时", style:Theme.of(context).textTheme.titleLarge),
+        TweenAnimationBuilder<double>(
+          tween: Tween(
+            begin: 0,
+            end: 1
+          ), 
+          curve: StaticsVar.curve,
+          duration: Duration(milliseconds: 500), 
+          builder: (context, value, child) {
+            return Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  padding: EdgeInsets.all(16.0),
+                  height: mediaQuery.size.height * 0.1,
+                  width: min(value*2, 1) * mediaQuery.size.width * (0.5 - 0.25*(context.read<PKServer>().pkState.selfTookenTime! - context.read<PKServer>().pkState.sideTookenTime!)/300),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.onPrimary,
+                  ),
+                  child: Text("你  ${(value*context.read<PKServer>().pkState.selfTookenTime!).floor()}秒", style: Theme.of(context).textTheme.headlineMedium, textAlign: TextAlign.end),
+                ),
+                Container(
+                  padding: EdgeInsets.all(16.0),
+                  height: mediaQuery.size.height * 0.1,
+                  width: min(value*2, 1) * mediaQuery.size.width * (0.5 + 0.25*(context.read<PKServer>().pkState.selfTookenTime! - context.read<PKServer>().pkState.sideTookenTime!)/300),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.onSecondary,
+                  ),
+                  child: Text("${(value*context.read<PKServer>().pkState.sideTookenTime!).floor()}秒  对方", style: Theme.of(context).textTheme.headlineMedium, textAlign: TextAlign.start),
+                ),
+              ],
+            );
+          }
+        ),
+        SizedBox(height: mediaQuery.size.height * 0.05),
+        Text("计算得分", style:Theme.of(context).textTheme.titleLarge),
+        TweenAnimationBuilder<double>(
+          tween: Tween(
+            begin: 0,
+            end: 1
+          ), 
+          curve: StaticsVar.curve,
+          duration: Duration(seconds: 2), 
+          builder: (context, value, child) {
+            return Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  padding: EdgeInsets.all(16.0),
+                  height: mediaQuery.size.height * 0.1,
+                  width: min(value*2, 1) * mediaQuery.size.width * (0.5 + 0.25*(selfPt - sidePt)/300),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.onPrimary,
+                  ),
+                  child: Text("你  ${(value*selfPt).round()}Pt", style: Theme.of(context).textTheme.headlineMedium, textAlign: TextAlign.end),
+                ),
+                Container(
+                  padding: EdgeInsets.all(16.0),
+                  height: mediaQuery.size.height * 0.1,
+                  width: min(value*2, 1) * mediaQuery.size.width * (0.5 - 0.25*(selfPt - sidePt)/300),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.onSecondary,
+                  ),
+                  child: Text("${(value*sidePt).round()}Pt  对方", style: Theme.of(context).textTheme.headlineMedium, textAlign: TextAlign.start),
+                ),
+              ],
+            );
+          }
+        ),
+        Expanded(child: SizedBox()),
+        ElevatedButton.icon(
+          style: ElevatedButton.styleFrom(
+            fixedSize: Size(mediaQuery.size.width * 0.8, mediaQuery.size.height * 0.15),
+            shape: RoundedRectangleBorder(borderRadius: StaticsVar.br)
+          ),
+          onPressed: () {
+            Navigator.popUntil(context, (route) => route.isFirst);
+          },
+          icon: Icon(Icons.exit_to_app),
+          label: Text("退出"),
+        )
+      ]
+    );
+  }
+}
+
+class TopScoreBar extends StatelessWidget {
+  final PKState state;
+  const TopScoreBar({super.key, required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    MediaQueryData mediaQuery = MediaQuery.of(context);
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            SizedBox(width: mediaQuery.size.width * 0.02),
+            Text("你的"),
+            Expanded(
+              child: TweenAnimationBuilder(
+                tween: Tween(
+                  begin: 0.0,
+                  end: context.watch<PKServer>().pkState.selfProgress.length/context.watch<PKServer>().pkState.testWords.length
+                ),
+                duration: Duration(milliseconds: 500),
+                builder: (context, value, child) {
+                  return LinearProgressIndicator(
+                    value: value,
+                    minHeight: 15,
+                    borderRadius: StaticsVar.br,
+                  );
+                }
+              ),
+            ),
+            SizedBox(width: mediaQuery.size.width * 0.02)
+          ],
+        ),
+        Row(
+          children: [
+            SizedBox(width: mediaQuery.size.width * 0.02),
+            Text("对方"),
+            Expanded(
+              child: TweenAnimationBuilder(
+                tween: Tween(
+                  begin: 0.0,
+                  end: context.watch<PKServer>().pkState.sideProgress.length/context.watch<PKServer>().pkState.testWords.length
+                ),
+                duration: Duration(milliseconds: 500),
+                builder: (context, value, child) {
+                  return LinearProgressIndicator(
+                    value: value,
+                    minHeight: 15,
+                    borderRadius: StaticsVar.br,
+                  );
+                }
+              ),
+            ),
+            SizedBox(width: mediaQuery.size.width * 0.02),
+          ],
+        ),
+      ],
     );
   }
 }
