@@ -2,9 +2,11 @@ import 'dart:io' show HttpServer;
 import 'dart:math';
 import 'dart:convert';
 import 'dart:typed_data' show Uint8List;
+import 'package:arabic_learning/funcs/ui.dart' show alart;
 import 'package:arabic_learning/funcs/utili.dart';
 import 'package:arabic_learning/vars/config_structure.dart';
 import 'package:arabic_learning/vars/global.dart';
+import 'package:flutter/material.dart' show BuildContext, Navigator;
 import 'package:logging/logging.dart';
 import 'package:network_info_plus/network_info_plus.dart';
 import 'package:arabic_learning/vars/statics_var.dart';
@@ -274,8 +276,9 @@ class PKServer with ChangeNotifier{
     return 0;
   }
 
-  Future<void> watingSelection(Function onEnd) async {
+  Future<void> watingSelection(BuildContext context, Function onEnd) async {
     logger.fine("开始等待服务端选择课程");
+    bool isException = false;
     while(classSelection == null) {
       await Future.delayed(Duration(seconds: 1));
       try{
@@ -297,13 +300,15 @@ class PKServer with ChangeNotifier{
         classSelection = ClassSelection(selectedClass: selectedClass, countInReview: false);
       } catch (e) {
         logger.shout("连接服务端发生错误: $e");
-        rethrow;
+        if(context.mounted) alart(context, "连接丢失 ${e.toString()}", onConfirmed: () => Navigator.popUntil(context, (route) => route.isFirst));
+        isException = true;
+        break;
       } 
     }
-    onEnd();
+    if(!isException) onEnd();
   }
 
-  Future<void> watingPrepare() async {
+  Future<void> watingPrepare(BuildContext context) async {
     logger.fine("开始等待双端准备");
     while (!preparedP2 || startTime == null) {
       try{
@@ -330,22 +335,23 @@ class PKServer with ChangeNotifier{
         if(changed) notifyListeners();
       } catch (e) {
         logger.shout("连接服务端失败: $e");
-        rethrow;
+        if(context.mounted) alart(context, "连接丢失 ${e.toString()}", onConfirmed: () => Navigator.popUntil(context, (route) => route.isFirst));
+        break;
       }
     }
   }
 
-  void initPK() {
+  void initPK(BuildContext context) {
     pkState = PKState(
       testWords: getSelectedWords(global.wordData, classSelection!.selectedClass, doShuffle: true, shuffleSeed: rndSeed), 
       selfProgress: [], 
       sideProgress: []
     );
     logger.fine("已完成PKState初始化");
-    syncPKState();
+    syncPKState(context);
   }
 
-  Future<void> syncPKState() async {
+  Future<void> syncPKState(BuildContext context) async {
     logger.info("开始进行双端状态同步");
     int expCount = 0;
     while(pkState.selfTookenTime == null || pkState.sideTookenTime == null) {
@@ -383,7 +389,9 @@ class PKServer with ChangeNotifier{
         expCount++;
       }
     }
-    if(expCount == 5) throw Exception("Server disconnected");
+    if(expCount == 5) {
+      if(context.mounted) alart(context, "连接丢失 无法连接到服务端", onConfirmed: () => Navigator.popUntil(context, (route) => route.isFirst));
+    }
     try{
       await client.post(
         "$serverAddress/api/sync",

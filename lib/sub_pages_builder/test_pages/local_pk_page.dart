@@ -161,13 +161,7 @@ class _ServerPage extends State<LocalPKPage> {
   @override
   Widget build(BuildContext context) {
     if(!widget.isServer && !clientWaited) {
-      try{
-        context.read<PKServer>().watingSelection(() => pageController.nextPage(duration: Duration(milliseconds: 500), curve: StaticsVar.curve));
-      } catch (e) {
-        alart(context, "连接丢失 ${e.toString()}");
-        Navigator.pop(context);
-      }
-      
+      context.read<PKServer>().watingSelection(context, () => pageController.nextPage(duration: Duration(milliseconds: 500), curve: StaticsVar.curve));
       clientWaited = true;
     }
     return PopScope(
@@ -295,12 +289,7 @@ class _PKPreparePage extends State<PKPreparePage> {
     context.read<Global>().uiLogger.info("构建局域网联机准备页面");
     MediaQueryData mediaQuery = MediaQuery.of(context);
     if(!watching && !context.read<PKServer>().started) {
-      try{
-        context.read<PKServer>().watingPrepare();
-      } catch (e) {
-        alart(context, "连接丢失 ${e.toString()}");
-        Navigator.pop(context);
-      }
+      context.read<PKServer>().watingPrepare(context);
     }
     if(context.read<PKServer>().startTime != null&&!downCount) {
       downCount = true;
@@ -410,12 +399,7 @@ class _PKOngoingPage extends State<PKOngoingPage> {
     MediaQueryData mediaQuery = MediaQuery.of(context);
 
     if(state == 0) {
-      try {
-        if(!context.read<PKServer>().started) context.read<PKServer>().initPK();
-      } catch (e) {
-        alart(context, "连接丢失: ${e.toString()}");
-        Navigator.pop(context);
-      }
+      if(!context.read<PKServer>().started) context.read<PKServer>().initPK(context);
       
       Random rnd = Random(context.read<PKServer>().rndSeed);
       for(WordItem wordItem in context.read<PKServer>().pkState.testWords) {
