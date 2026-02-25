@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -33,35 +32,15 @@ Future<void> downloadFile(String url, String savePath, {ProgressCallback? onDown
   );
 }
 
-List<WordItem> getSelectedWords(BuildContext context , {List<ClassItem>? forceSelectClasses, bool doShuffle = false, bool doDouble = false}) {
-  final List<ClassItem> courseList = forceSelectClasses??[];
-  if(forceSelectClasses == null) {
-    final tpcPrefs = context.read<Global>().prefs.getString("tempConfig") ?? jsonEncode(StaticsVar.tempConfig);
-    final List<List<String>> cacheList = (jsonDecode(tpcPrefs)["SelectedClasses"] as List)
-        .cast<List>()
-        .map((e) => e.cast<String>().toList())
-        .toList();
-    for(List<String> cachedClass in cacheList) {
-      for(SourceItem sourceItem in context.read<Global>().wordData.classes){
-        if(sourceItem.sourceJsonFileName != cachedClass[0]){
-          continue;
-        }
-        if(sourceItem.subClasses.any((ClassItem classItem) => classItem.className == cachedClass[1])){
-          courseList.add(
-            sourceItem.subClasses.firstWhere((ClassItem classItem) => classItem.className == cachedClass[1])
-          );
-        }
-      }
-    }
-  }
+List<WordItem> getSelectedWords(DictData wordData , List<ClassItem> selectedClasses, {bool doShuffle = false, bool doDouble = false, int? shuffleSeed}) {
   List<WordItem> ans = [];
-  for(ClassItem c in courseList) {
+  for(ClassItem c in selectedClasses) {
     for (int wordIndex in c.wordIndexs){
-      ans.add(context.read<Global>().wordData.words[wordIndex]); // 保留id方便后面进度保存
+      ans.add(wordData.words[wordIndex]); // 保留id方便后面进度保存
     }
   }
   if(doDouble) ans = [...ans, ...ans];
-  if(doShuffle) ans.shuffle();
+  if(doShuffle) ans.shuffle(Random(shuffleSeed));
   return ans;
 }
 
