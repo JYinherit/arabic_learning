@@ -43,7 +43,7 @@ class _LocalPKSelectPage extends State<LocalPKSelectPage> {
         context, 
         MaterialPageRoute(builder: (context) => ChangeNotifierProvider.value(
           value: notifier,
-          child: ServerPage(isServer: false),
+          child: LocalPKPage(isServer: false),
         ))
       );
     } else if (statue == 1) {
@@ -82,7 +82,7 @@ class _LocalPKSelectPage extends State<LocalPKSelectPage> {
                 MaterialPageRoute(
                   builder: (context) => ChangeNotifierProvider.value(
                     value: notifier,
-                    child: ServerPage(isServer: true),
+                    child: LocalPKPage(isServer: true),
                   )
                 )
               );
@@ -146,32 +146,47 @@ class _LocalPKSelectPage extends State<LocalPKSelectPage> {
   }
 }
 
-class ServerPage extends StatefulWidget {
+class LocalPKPage extends StatefulWidget {
   final bool isServer;
-  const ServerPage({super.key, required this.isServer});
+  const LocalPKPage({super.key, required this.isServer});
 
   @override
   State<StatefulWidget> createState() => _ServerPage();
 }
 
-class _ServerPage extends State<ServerPage> {
+class _ServerPage extends State<LocalPKPage> {
   final PageController pageController = PageController();
   bool clientWaited = false;
 
   @override
   Widget build(BuildContext context) {
     if(!widget.isServer && !clientWaited) {
-      context.read<PKServer>().watingSelection(() => pageController.nextPage(duration: Duration(milliseconds: 500), curve: StaticsVar.curve));
+      try{
+        context.read<PKServer>().watingSelection(() => pageController.nextPage(duration: Duration(milliseconds: 500), curve: StaticsVar.curve));
+      } catch (e) {
+        alart(context, "连接丢失 ${e.toString()}");
+        Navigator.pop(context);
+      }
+      
       clientWaited = true;
     }
-    return PageView(
-      physics: NeverScrollableScrollPhysics(),
-      controller: pageController,
-      children: [
-        widget.isServer ? ServerHostWatingPage(pageController: pageController) : ClientWatingPage(),
-        PKPreparePage(pageController: pageController),
-        PKOngoingPage()
-      ],
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (didPop, result) {
+        if(widget.isServer) {
+          context.read<PKServer>().stopHost();
+        }
+        context.read<PKServer>().renew();
+      },
+      child: PageView(
+        physics: NeverScrollableScrollPhysics(),
+        controller: pageController,
+        children: [
+          widget.isServer ? ServerHostWatingPage(pageController: pageController) : ClientWatingPage(),
+          PKPreparePage(pageController: pageController),
+          PKOngoingPage()
+        ],
+      ),
     );
   }
 }
@@ -279,7 +294,14 @@ class _PKPreparePage extends State<PKPreparePage> {
   Widget build(BuildContext context) {
     context.read<Global>().uiLogger.info("构建局域网联机准备页面");
     MediaQueryData mediaQuery = MediaQuery.of(context);
-    if(!watching && !context.read<PKServer>().started) context.read<PKServer>().watingPrepare();
+    if(!watching && !context.read<PKServer>().started) {
+      try{
+        context.read<PKServer>().watingPrepare();
+      } catch (e) {
+        alart(context, "连接丢失 ${e.toString()}");
+        Navigator.pop(context);
+      }
+    }
     if(context.read<PKServer>().startTime != null&&!downCount) {
       downCount = true;
       Future.delayed(context.read<PKServer>().startTime!.difference(DateTime.now()), () {
@@ -388,7 +410,13 @@ class _PKOngoingPage extends State<PKOngoingPage> {
     MediaQueryData mediaQuery = MediaQuery.of(context);
 
     if(state == 0) {
-      if(!context.read<PKServer>().started) context.read<PKServer>().initPK();
+      try {
+        if(!context.read<PKServer>().started) context.read<PKServer>().initPK();
+      } catch (e) {
+        alart(context, "连接丢失: ${e.toString()}");
+        Navigator.pop(context);
+      }
+      
       Random rnd = Random(context.read<PKServer>().rndSeed);
       for(WordItem wordItem in context.read<PKServer>().pkState.testWords) {
         List<WordItem> optionWords = getRandomWords(4, context.read<Global>().wordData, allowRepet: false, include: wordItem, shuffle: true, rnd: rnd);

@@ -28,16 +28,16 @@ class PKServer with ChangeNotifier{
   DateTime? startTime;
   bool preparedP1 = false;
   bool preparedP2 = false;
-  late final PKState pkState;
+  late PKState pkState;
 
   // server
   bool started = false;
   Duration? delay;
-  late final HttpServer _server;
-  late final int _port;
+  late HttpServer _server;
+  late int _port;
 
   // client
-  late final String serverAddress;
+  String? serverAddress;
   final dio.Dio client = dio.Dio();
 
   String? get connectpwd {
@@ -57,6 +57,18 @@ class PKServer with ChangeNotifier{
     _localIP = await _networkInfo.getWifiIP();
     logger.finer("获取到局域网IP: $_localIP");
     global = outerglobal;
+  }
+
+  void renew() {
+    connected = false;
+    selectableSource = [];
+    classSelection = null;
+    startTime = null;
+    preparedP1 = false;
+    preparedP2 = false;
+    started = false;
+    delay = null;
+    serverAddress = null;
   }
 
   Future<bool> startHost() async {
@@ -335,8 +347,12 @@ class PKServer with ChangeNotifier{
 
   Future<void> syncPKState() async {
     logger.info("开始进行双端状态同步");
+    int expCount = 0;
     while(pkState.selfTookenTime == null || pkState.sideTookenTime == null) {
       try{
+        if(expCount == 5) {
+          break;
+        }
         await Future.delayed(Duration(milliseconds: 500));
         logger.finer("进行状态数据交换");
         final syncRes = await client.post(
@@ -360,11 +376,14 @@ class PKServer with ChangeNotifier{
           pkState.sideTookenTime = syncRes.data["tooken"];
           changed = true;
         }
+        expCount = 0;
         if(changed) notifyListeners();
       } catch (e) {
         logger.shout("同步状态失败 $e");
+        expCount++;
       }
     }
+    if(expCount == 5) throw Exception("Server disconnected");
     try{
       await client.post(
         "$serverAddress/api/sync",
