@@ -158,7 +158,7 @@ class PKServer with ChangeNotifier{
         changed = true;
       }
       if(pkState.sideProgress.length == pkState.testWords.length && body["tooken"] != null) {
-        pkState.sideTookenTime = body["tooken"] - delay!.inSeconds;
+        pkState.sideTookenTime = body["tooken"] - (delay!.inMilliseconds/1000).round();
         logger.fine("已更新本地PKState.sideTookenTime");
         changed = true;
       }
@@ -262,7 +262,7 @@ class PKServer with ChangeNotifier{
     return 0;
   }
 
-  Future<ClassSelection> watingSelection() async {
+  Future<void> watingSelection(Function onEnd) async {
     logger.fine("开始等待服务端选择课程");
     while(classSelection == null) {
       await Future.delayed(Duration(seconds: 1));
@@ -288,7 +288,7 @@ class PKServer with ChangeNotifier{
         rethrow;
       } 
     }
-    return classSelection!;
+    onEnd();
   }
 
   Future<void> watingPrepare() async {
@@ -335,7 +335,7 @@ class PKServer with ChangeNotifier{
 
   Future<void> syncPKState() async {
     logger.info("开始进行双端状态同步");
-    while(true) {
+    while(pkState.selfTookenTime == null || pkState.sideTookenTime == null) {
       try{
         await Future.delayed(Duration(milliseconds: 500));
         logger.finer("进行状态数据交换");
@@ -343,7 +343,7 @@ class PKServer with ChangeNotifier{
           "$serverAddress/api/sync",
           data: {
             "progress": pkState.selfProgress,
-            "tooken": pkState.selfTookenTime
+            "tooken": null
           },
           options: dio.Options(connectTimeout: Duration(seconds: 1))
         );
@@ -361,15 +361,25 @@ class PKServer with ChangeNotifier{
           changed = true;
         }
         if(changed) notifyListeners();
-        if(pkState.selfTookenTime != null && pkState.sideTookenTime != null) {
-          client.get("$serverAddress/api/done");
-          logger.fine("已通知服务端联机进程完成");
-          break;
-        }
       } catch (e) {
         logger.shout("同步状态失败 $e");
       }
     }
+    try{
+      await client.post(
+        "$serverAddress/api/sync",
+        data: {
+          "progress": pkState.selfProgress,
+          "tooken": pkState.selfTookenTime
+        },
+        options: dio.Options(connectTimeout: Duration(seconds: 1))
+      );
+      client.get("$serverAddress/api/done");
+      logger.fine("已通知服务端联机进程完成");
+    } catch (e) {
+      logger.shout("同步状态失败 $e");
+    }
+    
   }
 
   void updateState(bool correct) {

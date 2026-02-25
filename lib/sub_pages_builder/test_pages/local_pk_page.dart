@@ -43,7 +43,7 @@ class _LocalPKSelectPage extends State<LocalPKSelectPage> {
         context, 
         MaterialPageRoute(builder: (context) => ChangeNotifierProvider.value(
           value: notifier,
-          child: ClientWatingPage(),
+          child: ServerPage(isServer: false),
         ))
       );
     } else if (statue == 1) {
@@ -82,7 +82,7 @@ class _LocalPKSelectPage extends State<LocalPKSelectPage> {
                 MaterialPageRoute(
                   builder: (context) => ChangeNotifierProvider.value(
                     value: notifier,
-                    child: ServerHostWatingPage(),
+                    child: ServerPage(isServer: true),
                   )
                 )
               );
@@ -146,14 +146,40 @@ class _LocalPKSelectPage extends State<LocalPKSelectPage> {
   }
 }
 
-class ServerHostWatingPage extends StatefulWidget {
-  const ServerHostWatingPage({super.key});
+class ServerPage extends StatefulWidget {
+  final bool isServer;
+  const ServerPage({super.key, required this.isServer});
 
   @override
-  State<StatefulWidget> createState() => _ServerHostWatingPage();
+  State<StatefulWidget> createState() => _ServerPage();
 }
 
-class _ServerHostWatingPage extends State<ServerHostWatingPage> {
+class _ServerPage extends State<ServerPage> {
+  final PageController pageController = PageController();
+  bool clientWaited = false;
+
+  @override
+  Widget build(BuildContext context) {
+    if(!widget.isServer && !clientWaited) {
+      context.read<PKServer>().watingSelection(() => pageController.nextPage(duration: Duration(milliseconds: 500), curve: StaticsVar.curve));
+      clientWaited = true;
+    }
+    return PageView(
+      physics: NeverScrollableScrollPhysics(),
+      controller: pageController,
+      children: [
+        widget.isServer ? ServerHostWatingPage(pageController: pageController) : ClientWatingPage(),
+        PKPreparePage(pageController: pageController),
+        PKOngoingPage()
+      ],
+    );
+  }
+}
+
+class ServerHostWatingPage extends StatelessWidget {
+  final PageController pageController;
+  const ServerHostWatingPage({super.key, required this.pageController});
+
   @override
   Widget build(BuildContext context) {
     context.read<Global>().uiLogger.info("构建局域网联机课程选择页面");
@@ -174,14 +200,7 @@ class _ServerHostWatingPage extends State<ServerHostWatingPage> {
                 ClassSelection selection = await popSelectClasses(context, forceSelectRange: context.read<PKServer>().selectableSource, withCache: false, withReviewChoose: false);
                 if(!context.mounted) return;
                 context.read<PKServer>().classSelection = selection;
-                PKServer notifier = context.read<PKServer>();
-                Navigator.push(
-                  context, 
-                  MaterialPageRoute(builder: (context) => ChangeNotifierProvider.value(
-                    value: notifier,
-                    child: PKPreparePage(),
-                  ))
-                );
+                pageController.nextPage(duration: Duration(milliseconds: 500), curve: StaticsVar.curve);
               }, 
               child: Text("开始选课")
             )
@@ -230,28 +249,23 @@ class ClientWatingPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     context.read<Global>().uiLogger.info("构建局域网联机等待页面");
-    return FutureBuilder(
-      future: context.read<PKServer>().watingSelection(),
-      builder: (context, asyncSnapshot) {
-        return asyncSnapshot.hasData 
-        ? PKPreparePage()
-        : Scaffold(
-          appBar: AppBar(title: Text("连接成功")),
-          body: Center(child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircularProgressIndicator(),
-              Text("正在等待房主选择课程")
-            ]
-          ))
-        );
-      }
+    
+    return Scaffold(
+      appBar: AppBar(title: Text("连接成功")),
+      body: Center(child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CircularProgressIndicator(),
+          Text("正在等待房主选择课程")
+        ]
+      ))
     );
   }
 }
 
 class PKPreparePage extends StatefulWidget {
-  const PKPreparePage({super.key});
+  final PageController pageController;
+  const PKPreparePage({super.key, required this.pageController});
 
   @override
   State<StatefulWidget> createState() => _PKPreparePage();
@@ -270,15 +284,7 @@ class _PKPreparePage extends State<PKPreparePage> {
       downCount = true;
       Future.delayed(context.read<PKServer>().startTime!.difference(DateTime.now()), () {
         if(!context.mounted) return;
-        PKServer notifier = context.read<PKServer>();
-        Navigator.pop(context);
-        Navigator.push(
-          context, 
-          MaterialPageRoute(builder: (context) => ChangeNotifierProvider.value(
-            value: notifier,
-            child: PKOngoingPage(),
-          ))
-        );
+        widget.pageController.nextPage(duration: Duration(milliseconds: 500), curve: StaticsVar.curve);
       });
     }
     return Scaffold(
