@@ -55,6 +55,7 @@ class PKServer with ChangeNotifier{
 
   Future<void> init(Global outerglobal) async {
     _localIP = await _networkInfo.getWifiIP();
+    logger.finer("获取到局域网IP: $_localIP");
     global = outerglobal;
   }
 
@@ -65,6 +66,7 @@ class PKServer with ChangeNotifier{
     final router = Router();
 
     router.get('/api/check', (Request req) {
+      logger.fine("收到check请求");
       return Response.ok(
         '{"version":${StaticsVar.appVersion}}',
         headers: {'Content-Type': 'application/json'},
@@ -74,6 +76,7 @@ class PKServer with ChangeNotifier{
     router.post('/api/testDictSum', (Request req) async {
       if(connected == true) return Response.forbidden("");
       Map<String, dynamic> body = json.decode(await req.readAsString());
+      logger.fine("收到testDictSum请求，负载: $body");
       // {
       //  "dictSum": ["SHA256", ...]
       // }
@@ -81,6 +84,7 @@ class PKServer with ChangeNotifier{
       selectableSource.clear();
       for(SourceItem source in global.wordData.classes) {
         if(sumList.contains(source.getHash(global.wordData.words))) selectableSource.add(source);
+        logger.fine("计算得到${source.sourceJsonFileName}在哈希中有匹配");
       }
       if(selectableSource.isNotEmpty) connected = true;
       notifyListeners();
@@ -93,10 +97,13 @@ class PKServer with ChangeNotifier{
     });
 
     router.get('/api/selection', (Request req) {
+      logger.fine("收到selection请求");
       if(classSelection == null) {
+        logger.fine("房主暂未完成选择，statue: false");
         return Response.ok(json.encode({"statue": false}), headers: {'Content-Type': 'application/json'});
       }
       rndSeed = Random().nextInt(1024);
+      logger.finer("随机种子: $rndSeed");
       return Response.ok(
         json.encode(
           {
@@ -111,11 +118,15 @@ class PKServer with ChangeNotifier{
 
     router.post('/api/prepare', (Request req) async {
       Map<String, dynamic> body = json.decode(await req.readAsString());
+      logger.fine("收到prepare请求，负载 $body");
+
       if(body["time"] != null && delay == null) {
         delay = DateTime.tryParse(body["time"])!.difference(DateTime.now());
+        logger.info("已加载双端延迟补偿: ${delay!.inSeconds}秒");
       }
       if(body["prepared"]) {
         preparedP2 = true;
+        logger.fine("对方准备完毕");
         if(preparedP1 && startTime == null) {
           startTime = DateTime.now().add(Duration(seconds: 5));
           pkState = PKState(
@@ -123,6 +134,7 @@ class PKServer with ChangeNotifier{
             selfProgress: [], 
             sideProgress: []
           );
+          logger.fine("已生成开始时间: $startTime(添加delay后为: ${startTime?.add(delay!).toIso8601String()}); PKState已初始化");
         }
         notifyListeners();
       }
@@ -138,16 +150,20 @@ class PKServer with ChangeNotifier{
 
     router.post('/api/sync', (Request req) async {
       Map<String, dynamic> body = json.decode(await req.readAsString());
+      logger.finer("收到sync请求，负载: $body");
       bool changed = false;
       if(body["progress"] != null && body["progress"].length != pkState.sideProgress.length) {
         pkState.sideProgress = List.generate(body["progress"].length, (int index) => body["progress"][index] as bool);
+        logger.fine("已更新本地PKState.sideProgress");
         changed = true;
       }
       if(pkState.sideProgress.length == pkState.testWords.length && body["tooken"] != null) {
         pkState.sideTookenTime = body["tooken"] - delay!.inSeconds;
+        logger.fine("已更新本地PKState.sideTookenTime");
         changed = true;
       }
       if(changed) notifyListeners();
+      if(pkState.selfTookenTime != null) logger.fine("回报本地tokenTime: ${pkState.selfTookenTime}");
       return Response.ok(json.encode({
         "progress": pkState.selfProgress,
         "tooken": pkState.selfTookenTime
@@ -157,6 +173,7 @@ class PKServer with ChangeNotifier{
     });
 
     router.get('/api/done', (Request req) async {
+      logger.info("收到done请求");
       Future.delayed(Duration(seconds: 1), () {
         stopHost();
       });
@@ -210,6 +227,7 @@ class PKServer with ChangeNotifier{
       return 1;
     }
     serverAddress = "http://${_localIP!.split(".")[0]}.${addressinfo[0]}.${addressinfo[1]}.${addressinfo[2]}:${addressinfo[3]}";
+    logger.info("服务端口解析结果: $serverAddress");
     final checkRes = await client.get("$serverAddress/api/check");
     if(checkRes.statusCode != 200) {
       logger.severe("连接服务端失败");
@@ -219,6 +237,7 @@ class PKServer with ChangeNotifier{
       logger.severe("版本校验不通过，对方版本为: ${checkRes.data["version"]}，我方为${StaticsVar.appVersion}");
       return 3;
     }
+    logger.fine("双端版本校验通过");
     final dictRes = await client.post(
       "$serverAddress/api/testDictSum", 
       data: {
@@ -244,26 +263,26 @@ class PKServer with ChangeNotifier{
   }
 
   Future<ClassSelection> watingSelection() async {
+    logger.fine("开始等待服务端选择课程");
     while(classSelection == null) {
       await Future.delayed(Duration(seconds: 1));
       try{
+        logger.fine("正在检查选择情况");
         final selectionRes = await client.get("$serverAddress/api/selection", options: dio.Options(connectTimeout: Duration(seconds: 1)));
-        if(selectionRes.statusCode == 200) {
-          Map payload = selectionRes.data;
-          if(!payload["statue"]) continue;
-          rndSeed = payload["seed"];
-          List<ClassItem> selectedClass = [];
-          for(SourceItem sourceItem in selectableSource) {
-            for(ClassItem classItem in sourceItem.subClasses){
-              if(payload["selected"].contains(classItem.getHash())){
-                selectedClass.add(classItem);
-              }
+        if(selectionRes.statusCode != 200) throw Exception("Unexcepted statusCode: ${selectionRes.statusCode}");
+        Map payload = selectionRes.data;
+        logger.finer("此次检查结果: $payload");
+        if(!payload["statue"]) continue;
+        rndSeed = payload["seed"];
+        List<ClassItem> selectedClass = [];
+        for(SourceItem sourceItem in selectableSource) {
+          for(ClassItem classItem in sourceItem.subClasses){
+            if(payload["selected"].contains(classItem.getHash())){
+              selectedClass.add(classItem);
             }
           }
-          classSelection = ClassSelection(selectedClass: selectedClass, countInReview: false);
-        } else {
-          throw Exception("Unexcepted statusCode: ${selectionRes.statusCode}");
         }
+        classSelection = ClassSelection(selectedClass: selectedClass, countInReview: false);
       } catch (e) {
         logger.shout("连接服务端发生错误: $e");
         rethrow;
@@ -273,8 +292,10 @@ class PKServer with ChangeNotifier{
   }
 
   Future<void> watingPrepare() async {
+    logger.fine("开始等待双端准备");
     while (!preparedP2 || startTime == null) {
       try{
+        logger.fine("正在交换等待情况");
         await Future.delayed(Duration(seconds: 1));
         final prepareRes = await client.post(
           "$serverAddress/api/prepare", 
@@ -284,6 +305,7 @@ class PKServer with ChangeNotifier{
           }
         );
         if(prepareRes.statusCode != 200) throw Exception("Unexcepted statusCode: ${prepareRes.statusCode}");
+        logger.finer("交换结果: ${prepareRes.data}");
         bool changed = false;
         if(preparedP2 != prepareRes.data["prepared"]) {
           preparedP2 = prepareRes.data["prepared"];
@@ -307,13 +329,16 @@ class PKServer with ChangeNotifier{
       selfProgress: [], 
       sideProgress: []
     );
+    logger.fine("已完成PKState初始化");
     syncPKState();
   }
 
   Future<void> syncPKState() async {
+    logger.info("开始进行双端状态同步");
     while(true) {
       try{
         await Future.delayed(Duration(milliseconds: 500));
+        logger.finer("进行状态数据交换");
         final syncRes = await client.post(
           "$serverAddress/api/sync",
           data: {
@@ -323,18 +348,22 @@ class PKServer with ChangeNotifier{
           options: dio.Options(connectTimeout: Duration(seconds: 1))
         );
         if(syncRes.statusCode != 200) throw Exception("Unexcepted statusCode: ${syncRes.statusCode}");
+        logger.finer("对方交换结果为: ${syncRes.data}");
         bool changed = false;
         if(syncRes.data["progress"] != null && syncRes.data["progress"].length != pkState.sideProgress.length) {
           pkState.sideProgress = List.generate(syncRes.data["progress"].length, (int index) => syncRes.data["progress"][index] as bool);
+          logger.fine("已更新本地PKState.sideProgress");
           changed = true;
         }
         if(pkState.sideProgress.length == pkState.testWords.length && syncRes.data["tooken"] != null) {
+          logger.fine("已更新本地PKState.sideTookenTime");
           pkState.sideTookenTime = syncRes.data["tooken"];
           changed = true;
         }
         if(changed) notifyListeners();
         if(pkState.selfTookenTime != null && pkState.sideTookenTime != null) {
           client.get("$serverAddress/api/done");
+          logger.fine("已通知服务端联机进程完成");
           break;
         }
       } catch (e) {

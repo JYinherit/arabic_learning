@@ -63,6 +63,7 @@ class _LocalPKSelectPage extends State<LocalPKSelectPage> {
 
   @override
   Widget build(BuildContext context) {
+    context.read<Global>().uiLogger.info("构建局域网联机主页面");
     MediaQueryData mediaQuery = MediaQuery.of(context);
     PKServer notifier = context.read<PKServer>();
     return Scaffold(
@@ -155,6 +156,7 @@ class ServerHostWatingPage extends StatefulWidget {
 class _ServerHostWatingPage extends State<ServerHostWatingPage> {
   @override
   Widget build(BuildContext context) {
+    context.read<Global>().uiLogger.info("构建局域网联机课程选择页面");
     MediaQueryData mediaQuery = MediaQuery.of(context);
     return context.watch<PKServer>().connected 
     ? Scaffold(
@@ -227,6 +229,7 @@ class ClientWatingPage extends StatelessWidget {
   
   @override
   Widget build(BuildContext context) {
+    context.read<Global>().uiLogger.info("构建局域网联机等待页面");
     return FutureBuilder(
       future: context.read<PKServer>().watingSelection(),
       builder: (context, asyncSnapshot) {
@@ -260,6 +263,7 @@ class _PKPreparePage extends State<PKPreparePage> {
 
   @override
   Widget build(BuildContext context) {
+    context.read<Global>().uiLogger.info("构建局域网联机准备页面");
     MediaQueryData mediaQuery = MediaQuery.of(context);
     if(!watching && !context.read<PKServer>().started) context.read<PKServer>().watingPrepare();
     if(context.read<PKServer>().startTime != null&&!downCount) {
@@ -368,6 +372,7 @@ class _PKOngoingPage extends State<PKOngoingPage> {
 
   @override
   Widget build(BuildContext context) {
+    context.read<Global>().uiLogger.info("构建局域网联机对局页面");
     MediaQueryData mediaQuery = MediaQuery.of(context);
 
     if(state == 0) {
@@ -466,6 +471,7 @@ class PKConclue extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.read<Global>().uiLogger.info("构建局域网联机总结");
     MediaQueryData mediaQuery = MediaQuery.of(context);
 
     return Column(
