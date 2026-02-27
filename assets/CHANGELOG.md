@@ -1,21 +1,76 @@
 # Changelog
 
-## v?.?.?? - ????-??-?? - (??????)
+## v?.?.? - ????-??-?? - (??????)
+
+### Added
+
+- 添加了局域网联机功能
+
+### Improvement
+
+- 优化了单词卡片的排版
+
+### Fix
+
+- 修复了自我评级开启时复习页面可能溢出的问题
+
+## v0.1.13 - 2026-2-6 - (000113)
+
+### Added
+
+- 添加了备份数据文件导出功能 [#50](https://github.com/OctagonalStar/arabic_learning/issues/50)
+- 添加了易混词偏好配置
+- 添加了词汇查找功能 [#49](https://github.com/OctagonalStar/arabic_learning/issues/49)
+- 添加了常见问题页面
+- 给部分文本框添加了动画
+- 添加了听力题型 [#51](https://github.com/OctagonalStar/arabic_learning/issues/51)
+- 为每次学习添加了是否计算复习的提示 [#52](https://github.com/OctagonalStar/arabic_learning/issues/52)
+- 在复习部分添加了自我评级方案 [#52](https://github.com/OctagonalStar/arabic_learning/issues/52)
+- 添加了每日单词推送功能 [#52](https://github.com/OctagonalStar/arabic_learning/issues/52)
+
+### Improvement
+
+- 优化了选择题单词挑选逻辑 [#48](https://github.com/OctagonalStar/arabic_learning/issues/48)
+- 修复了BKTree日志刷屏问题
+- 移除了提醒配置的中间页面
+- 对于拼写题型放宽了时间要求 [#52](https://github.com/OctagonalStar/arabic_learning/issues/52)
+
+### Fix
+
+- 将设置选项重新放回首页
+- 修复了拼写题错误问题
+
+## v0.1.12 - 2025-12-27 - (000112)
 
 ### Added
 
 - 添加了日志捕获 [#23](https://github.com/OctagonalStar/arabic_learning/issues/23)
 - 添加了调试页面
 - 添加了个性化FSRS预设页面 [#26](https://github.com/OctagonalStar/arabic_learning/issues/26)
+- 添加了安卓通知功能 [#24](https://github.com/OctagonalStar/arabic_learning/issues/24)
+- 添加了题型可拖动提示 [#43](https://github.com/OctagonalStar/arabic_learning/issues/43)
 
 ### Improvement
 
 - 优化了网页端字体加载逻辑
+- 重构了Config数据结构 [#27](https://github.com/OctagonalStar/arabic_learning/issues/27)
+- 重构了软件运行时数据结构 [#16](https://github.com/OctagonalStar/arabic_learning/issues/16)
+- 优化连胜逻辑: FSRS复习也计算为连胜
+- 调整了部分按钮的UI设计
+- 去除了查看详解时，单词卡片的高斯模糊
+- 按照FSRS学习单词计算总学习单词[#45](https://github.com/OctagonalStar/arabic_learning/issues/45)
 
 ### Fix
 
 - 修复了FSRS算法对已经过期的单词无法计数的问题
 - 修复了日志中FSRS信息输出错误的问题
+- 修复了新用户无法进入的问题
+- 修复了FSRS复习界面中，“下一题”动画期间文字溢出的问题
+- 修复了固定列数文本溢出的问题[#44](https://github.com/OctagonalStar/arabic_learning/issues/44)
+
+### Delete
+
+- 移除了iOS系统的ipa安装支持
 
 ## v0.1.11 - 2025-11-28 - (000111)
 
