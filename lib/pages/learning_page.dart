@@ -69,7 +69,7 @@ class LearningPage extends StatelessWidget {
                 ),
               ),
               onPressed: (){
-                if(context.read<Global>().globalFSRS.getWillDueCount() != 0) {
+                if(context.read<Global>().globalFSRS.getWillDueCount() != 0 || !context.read<Global>().globalFSRS.config.enabled) {
                   context.read<Global>().uiLogger.info("跳转: LearningPage => ForeFSRSSettingPage");
                   Navigator.push(
                     context, 
@@ -105,13 +105,15 @@ class LearningPage extends StatelessWidget {
           onPressed: (){
             final DateTime now = DateTime.now();
             final int seed = now.year * 10000 + now.month * 100 + now.day;
-            final List<WordItem> pushWords = [];
+            final Set<WordItem> pushWords = {};
             final Random rnd = Random(seed);
-            for(int i = 0; i < context.read<Global>().globalFSRS.config.pushAmount; i++){
+            int tries = 0;
+            while(pushWords.length < context.read<Global>().globalFSRS.config.pushAmount && tries < context.read<Global>().globalFSRS.config.pushAmount * 10){
               int chosen = rnd.nextInt(context.read<Global>().wordData.words.length);
               if(!context.read<Global>().globalFSRS.isContained(chosen)) {
                 pushWords.add(context.read<Global>().wordData.words.elementAt(chosen));
               }
+              tries++;
             }
             if(pushWords.isEmpty) {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -123,7 +125,7 @@ class LearningPage extends StatelessWidget {
             Navigator.push(
               context, 
               MaterialPageRoute(
-                builder: (context) => FSRSLearningPage(fsrs: context.read<Global>().globalFSRS, words: pushWords)
+                builder: (context) => FSRSLearningPage(fsrs: context.read<Global>().globalFSRS, words: pushWords.toList())
               )
             );
           },

@@ -55,8 +55,11 @@ class FSRS {
     int index = config.cards.indexWhere((Card card) => card.cardId == wordId); // 避免有时候cardId != wordId
     logger.fine("定位复习卡片地址: $index, 目前阶段: ${config.cards[index].step}, 难度: ${config.cards[index].difficulty}, 稳定: ${config.cards[index].stability}, 过期时间(+8): ${config.cards[index].due.toLocal()}");
     final (:card, :reviewLog) = config.scheduler!.reviewCard(config.cards[index], forceRate ?? calculate(duration, isCorrect), reviewDateTime: DateTime.now().toUtc(), reviewDuration: duration);
-    config.cards[index] = card;
-    config.reviewLogs[index] = reviewLog;
+    List<Card> newCards = List.from(config.cards);
+    List<ReviewLog> newLogs = List.from(config.reviewLogs);
+    newCards[index] = card;
+    newLogs[index] = reviewLog;
+    config = config.copyWith(cards: newCards, reviewLogs: newLogs);
     logger.fine("卡片 $index 复习后: 目前阶段: ${config.cards[index].step}, 难度: ${config.cards[index].difficulty}, 稳定: ${config.cards[index].stability}, 过期时间(+8): ${config.cards[index].due.toLocal()}");
     save();
   }
@@ -89,8 +92,10 @@ class FSRS {
   void addWordCard(int wordId) {
     logger.fine("添加复习卡片: Id: $wordId");
     // os the wordID == cardID
-    config.cards.add(Card(cardId: wordId, state: State.learning));
-    config.reviewLogs.add(ReviewLog(cardId: wordId, rating: Rating.good, reviewDateTime: DateTime.now()));
+    config = config.copyWith(
+      cards: List.from(config.cards)..add(Card(cardId: wordId, state: State.learning)),
+      reviewLogs: List.from(config.reviewLogs)..add(ReviewLog(cardId: wordId, rating: Rating.good, reviewDateTime: DateTime.now()))
+    );
     save();
   }
 
