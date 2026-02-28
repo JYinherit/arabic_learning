@@ -55,11 +55,8 @@ class FSRS {
     int index = config.cards.indexWhere((Card card) => card.cardId == wordId); // 避免有时候cardId != wordId
     logger.fine("定位复习卡片地址: $index, 目前阶段: ${config.cards[index].step}, 难度: ${config.cards[index].difficulty}, 稳定: ${config.cards[index].stability}, 过期时间(+8): ${config.cards[index].due.toLocal()}");
     final (:card, :reviewLog) = config.scheduler!.reviewCard(config.cards[index], forceRate ?? calculate(duration, isCorrect), reviewDateTime: DateTime.now().toUtc(), reviewDuration: duration);
-    List<Card> newCards = List.from(config.cards);
-    List<ReviewLog> newLogs = List.from(config.reviewLogs);
-    newCards[index] = card;
-    newLogs[index] = reviewLog;
-    config = config.copyWith(cards: newCards, reviewLogs: newLogs);
+    config.cards[index] = card;
+    config.reviewLogs[index] = reviewLog;
     logger.fine("卡片 $index 复习后: 目前阶段: ${config.cards[index].step}, 难度: ${config.cards[index].difficulty}, 稳定: ${config.cards[index].stability}, 过期时间(+8): ${config.cards[index].due.toLocal()}");
     save();
   }
@@ -75,6 +72,7 @@ class FSRS {
   }
 
   int getLeastDueCard() {
+    if (config.cards.isEmpty) return -1;
     int leastDueIndex = 0;
     for(int i = 1; i < config.cards.length; i++) {
       if(config.cards[i].due.toLocal().isBefore(config.cards[leastDueIndex].due.toLocal()) && config.cards[i].due.toLocal().difference(DateTime.now()) < Duration(days: 1)) {
@@ -91,11 +89,12 @@ class FSRS {
 
   void addWordCard(int wordId) {
     logger.fine("添加复习卡片: Id: $wordId");
+    if (config.cards.isEmpty) {
+      config = config.copyWith(cards: [], reviewLogs: []);
+    }
     // os the wordID == cardID
-    config = config.copyWith(
-      cards: List.from(config.cards)..add(Card(cardId: wordId, state: State.learning)),
-      reviewLogs: List.from(config.reviewLogs)..add(ReviewLog(cardId: wordId, rating: Rating.good, reviewDateTime: DateTime.now()))
-    );
+    config.cards.add(Card(cardId: wordId, state: State.learning));
+    config.reviewLogs.add(ReviewLog(cardId: wordId, rating: Rating.good, reviewDateTime: DateTime.now()));
     save();
   }
 
