@@ -213,7 +213,7 @@ extension StringExtensions on String {
     // int union = set1.union(set2).length;
     
     // 如果短词里包含任何相同的核心字，或共有汉字超过短词的 40% (应对同义替换)
-    int minLength = [set1.length, set2.length].reduce(min);
+    int minLength = min(set1.length, set2.length);
     
     // 如果它们很短，只要共享一个字就算（例如：走 / 行走）
     if(minLength <= 2 && intersection >= 1) return true;
