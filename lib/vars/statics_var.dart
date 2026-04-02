@@ -7,7 +7,7 @@ import 'package:just_audio/just_audio.dart';
 @immutable
 class StaticsVar {
   static const String appName = 'Ar 学';
-  static const int appVersion = 000113;
+  static const int appVersion = 100000;
   static const String modelPath = 'arabicLearning/tts/model/vits-piper-ar_JO-kareem-medium';
   static const Map<String, dynamic> tempConfig = {"SelectedClasses": []};
   static const Curve curve = Curves.fastEaseInToSlowEaseOut;
