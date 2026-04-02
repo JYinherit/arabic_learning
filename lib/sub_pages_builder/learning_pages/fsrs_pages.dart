@@ -281,25 +281,77 @@ class ForeFSRSSettingPage extends StatelessWidget {
   }
 }
 
-class MainFSRSPage extends StatelessWidget {
+class MainFSRSPage extends StatefulWidget {
   final FSRS fsrs;
   const MainFSRSPage({super.key, required this.fsrs});
-  
+
+  @override
+  State<MainFSRSPage> createState() => _MainFSRSPageState();
+}
+
+class _MainFSRSPageState extends State<MainFSRSPage> {
+  late List<int> dueCardIds;
+  late final PageController controller;
+  late final Random sharedRnd;
+
+  @override
+  void initState() {
+    super.initState();
+    controller = PageController();
+    sharedRnd = Random();
+    _loadDueCards();
+  }
+
+  static const int _repeatCount = 3;
+
+  void _loadDueCards() {
+    final uniqueIds = widget.fsrs.config.cards
+        .where((card) => card.due.toLocal().isBefore(DateTime.now()))
+        .map((card) => card.cardId)
+        .toList();
+    // 交错顺序 [A,B,C, A,B,C, ...] — 每轮过完所有词再重复
+    dueCardIds = [
+      for (int i = 0; i < _repeatCount; i++)
+        ...uniqueIds
+    ];
+  }
+
+  void _refresh() {
+    setState(() {
+      _loadDueCards();
+      // Jump back to first content page
+      controller.jumpToPage(1);
+    });
+  }
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    context.read<Global>().uiLogger.info("构建 MainFSRSPage");
+    context.read<Global>().uiLogger.info("构建 MainFSRSPage, 待复习: ${dueCardIds.length}");
     MediaQueryData mediaQuery = MediaQuery.of(context);
-    final PageController controller = PageController();
-    Random sharedRnd = Random();
+
+    // page 0: summary, pages 1..N: review cards, page N+1: done
+    final int totalPages = dueCardIds.isEmpty ? 1 : dueCardIds.length + 2;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text("规律学习"),
         actions: [
           IconButton(
+            icon: Icon(Icons.refresh),
+            tooltip: "刷新复习列表",
+            onPressed: _refresh,
+          ),
+          IconButton(
             icon: Icon(Icons.keyboard_option_key),
             onPressed: () {
               showModalBottomSheet(
-                context: context, 
+                context: context,
                 isScrollControlled: true,
                 enableDrag: false,
                 builder: (context) => ForeFSRSSettingPage(forceChoosing: true)
@@ -311,24 +363,60 @@ class MainFSRSPage extends StatelessWidget {
       body: PageView.builder(
         scrollDirection: Axis.vertical,
         controller: controller,
+        physics: const PageScrollPhysics(),
+        itemCount: totalPages,
         itemBuilder: (context, index) {
-          final wordID = fsrs.getLeastDueCard();
-          if(wordID == -1) {
-            return Center(
-              child: TextContainer(text: "当前无需要复习的内容\n点击右上角可修改配置"),
-            );
-          }
-          if(index == 0) {
+          // Page 0: entry summary
+          if (index == 0) {
+            if (dueCardIds.isEmpty) {
+              return Center(
+                child: TextContainer(text: "当前无需要复习的内容\n点击右上角可修改配置"),
+              );
+            }
             return Center(
               child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  TextContainer(text: "你有${fsrs.getWillDueCount().toString()}个单词需要复习!\n上滑页面开始复习",size: Size(mediaQuery.size.width * 0.8, mediaQuery.size.height * 0.4),textAlign: TextAlign.center),
+                  TextContainer(
+                    text: "你有${dueCardIds.length}个单词需要复习!\n上滑页面开始复习",
+                    size: Size(mediaQuery.size.width * 0.8, mediaQuery.size.height * 0.4),
+                    textAlign: TextAlign.center,
+                  ),
                   Icon(Icons.arrow_upward, size: 48.0, color: Colors.grey)
                 ],
               ),
             );
           }
-          return FSRSReviewCardPage(wordID: wordID, fsrs: fsrs, rnd: sharedRnd, controller: controller,);
+
+          // Last page: completed
+          if (index == dueCardIds.length + 1) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  TextContainer(
+                    text: "本轮复习完成！\n如有新到期单词可点击右上角刷新",
+                    size: Size(mediaQuery.size.width * 0.8, mediaQuery.size.height * 0.4),
+                    textAlign: TextAlign.center,
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: _refresh,
+                    icon: Icon(Icons.refresh),
+                    label: Text("刷新"),
+                  )
+                ],
+              ),
+            );
+          }
+
+          // Review pages 1..N
+          final wordID = dueCardIds[index - 1];
+          return FSRSReviewCardPage(
+            wordID: wordID,
+            fsrs: widget.fsrs,
+            rnd: sharedRnd,
+            controller: controller,
+          );
         }
       )
     );

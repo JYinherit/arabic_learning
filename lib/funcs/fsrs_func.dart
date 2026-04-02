@@ -68,7 +68,7 @@ class FSRS {
   int getWillDueCount() {
     int dueCards = 0;
     for(int i = 0; i < config.cards.length; i++) {
-      if(willDueIn(i) < 1) {
+      if(config.cards[i].due.toLocal().isBefore(DateTime.now())) {
         dueCards++;
       }
     }
@@ -77,13 +77,15 @@ class FSRS {
 
   int getLeastDueCard() {
     if (config.cards.isEmpty) return -1;
-    int leastDueIndex = 0;
-    for(int i = 1; i < config.cards.length; i++) {
-      if(config.cards[i].due.toLocal().isBefore(config.cards[leastDueIndex].due.toLocal()) && config.cards[i].due.toLocal().difference(DateTime.now()) < Duration(days: 1)) {
-        leastDueIndex = i;
+    int leastDueIndex = -1;
+    for(int i = 0; i < config.cards.length; i++) {
+      if(config.cards[i].due.toLocal().isBefore(DateTime.now())) {
+        if(leastDueIndex == -1 || config.cards[i].due.toLocal().isBefore(config.cards[leastDueIndex].due.toLocal())) {
+          leastDueIndex = i;
+        }
       }
     }
-    if(config.cards[leastDueIndex].due.difference(DateTime.now()) > Duration(days: 1)) return -1;
+    if (leastDueIndex == -1) return -1;
     return config.cards[leastDueIndex].cardId;
   }
 
