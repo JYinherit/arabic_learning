@@ -29,6 +29,28 @@ class FSRS {
     } else {
       config = FSRSConfig.buildFromMap(jsonDecode(appData.storage.getString("fsrsData")!));
       logger.info("FSRS配置加载完成");
+      
+      // 清洗潜在的重复脏数据 (Deduplication)
+      final Set<int> seenIds = {};
+      final List<Card> uniqueCards = [];
+      final List<ReviewLog> uniqueLogs = [];
+      
+      for(int i = 0; i < config.cards.length; i++) {
+        final currentCardId = config.cards[i].cardId;
+        if(!seenIds.contains(currentCardId)) {
+          seenIds.add(currentCardId);
+          uniqueCards.add(config.cards[i]);
+          if(i < config.reviewLogs.length) {
+            uniqueLogs.add(config.reviewLogs[i]);
+          }
+        }
+      }
+      
+      if(uniqueCards.length < config.cards.length) {
+        logger.warning("发现并清理了 ${config.cards.length - uniqueCards.length} 条重复复习记录");
+        config = config.copyWith(cards: uniqueCards, reviewLogs: uniqueLogs);
+        save();
+      }
     }
     
     if(config.enabled) return true;
@@ -68,7 +90,7 @@ class FSRS {
   int getWillDueCount() {
     int dueCards = 0;
     for(int i = 0; i < config.cards.length; i++) {
-      if(config.cards[i].due.toLocal().isBefore(DateTime.now())) {
+      if(config.cards[i].due.toLocal().difference(DateTime.now()).inDays < 1) {
         dueCards++;
       }
     }
@@ -79,7 +101,7 @@ class FSRS {
     if (config.cards.isEmpty) return -1;
     int leastDueIndex = -1;
     for(int i = 0; i < config.cards.length; i++) {
-      if(config.cards[i].due.toLocal().isBefore(DateTime.now())) {
+      if(config.cards[i].due.toLocal().difference(DateTime.now()).inDays < 1) {
         if(leastDueIndex == -1 || config.cards[i].due.toLocal().isBefore(config.cards[leastDueIndex].due.toLocal())) {
           leastDueIndex = i;
         }
@@ -95,6 +117,10 @@ class FSRS {
 
   void addWordCard(int wordId) {
     logger.fine("添加复习卡片: Id: $wordId");
+    if(isContained(wordId)){
+      logger.fine("卡片 Id: $wordId 已存在，跳过重复添加");
+      return;
+    }
     if (config.cards.isEmpty) {
       config = config.copyWith(cards: [], reviewLogs: []);
     }
@@ -135,6 +161,7 @@ class FSRSConfig {
   final bool preferSimilar;
   final bool selfEvaluate;
   final int pushAmount;
+  final bool reinforceMemory;
 
   const FSRSConfig({
     bool? enabled,
@@ -146,7 +173,8 @@ class FSRSConfig {
     int? goodDuration,
     bool? preferSimilar,
     bool? selfEvaluate,
-    int? pushAmount
+    int? pushAmount,
+    bool? reinforceMemory
   }) :
     enabled = enabled??false,
     cards = cards??const [],
@@ -156,7 +184,8 @@ class FSRSConfig {
     goodDuration = goodDuration??6000,
     preferSimilar = preferSimilar??false,
     selfEvaluate = selfEvaluate??false,
-    pushAmount = pushAmount??0;
+    pushAmount = pushAmount??0,
+    reinforceMemory = reinforceMemory??true;
   
   Map<String, dynamic> toMap(){
     return {
@@ -169,7 +198,8 @@ class FSRSConfig {
       "goodDuration": goodDuration,
       "preferSimilar": preferSimilar,
       "selfEvaluate": selfEvaluate,
-      "pushAmount": pushAmount
+      "pushAmount": pushAmount,
+      "reinforceMemory": reinforceMemory
     };
   }
 
@@ -183,7 +213,8 @@ class FSRSConfig {
     int? goodDuration,
     bool? preferSimilar,
     bool? selfEvaluate,
-    int? pushAmount
+    int? pushAmount,
+    bool? reinforceMemory
   }) {
     return FSRSConfig(
       enabled: enabled??this.enabled,
@@ -195,7 +226,8 @@ class FSRSConfig {
       goodDuration: goodDuration??this.goodDuration,
       preferSimilar: preferSimilar??this.preferSimilar,
       selfEvaluate: selfEvaluate??this.selfEvaluate,
-      pushAmount: pushAmount??this.pushAmount
+      pushAmount: pushAmount??this.pushAmount,
+      reinforceMemory: reinforceMemory??this.reinforceMemory
     );
   }
 
@@ -211,7 +243,8 @@ class FSRSConfig {
         goodDuration: configData["goodDuration"],
         preferSimilar: configData["preferSimilar"],
         selfEvaluate: configData["selfEvaluate"],
-        pushAmount: configData["pushAmount"]
+        pushAmount: configData["pushAmount"],
+        reinforceMemory: configData["reinforceMemory"]
       );
     }
     return FSRSConfig(enabled: false);

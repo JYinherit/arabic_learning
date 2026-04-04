@@ -229,6 +229,36 @@ class ForeFSRSSettingPage extends StatelessWidget {
                   ],
                 ),
               ),
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: StaticsVar.br,
+                  color: Theme.of(context).colorScheme.onPrimary
+                ),
+                margin: EdgeInsets.all(8.0),
+                padding: EdgeInsets.all(8.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(child: Text("强化记忆循环", style: Theme.of(context).textTheme.bodyLarge)),
+                        Switch(
+                          value: fsrs.config.reinforceMemory, 
+                          onChanged: (value){
+                            setState(() {
+                              fsrs.config = fsrs.config.copyWith(
+                                reinforceMemory: value
+                              );
+                            });
+                          }
+                        )
+                      ],
+                    ),
+                    Text("开启后同一个到期卡片在队列中将按交错顺序出现多次（3次），加深印象。"),
+                    Text("关闭后每个词汇当次复习只在队列里出现一次。")
+                  ],
+                ),
+              ),
               ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
                   fixedSize: Size.fromHeight(100),
@@ -290,7 +320,7 @@ class MainFSRSPage extends StatefulWidget {
 }
 
 class _MainFSRSPageState extends State<MainFSRSPage> {
-  late List<int> dueCardIds;
+  late List<int> queue;
   late final PageController controller;
   late final Random sharedRnd;
 
@@ -299,29 +329,36 @@ class _MainFSRSPageState extends State<MainFSRSPage> {
     super.initState();
     controller = PageController();
     sharedRnd = Random();
-    _loadDueCards();
+    queue = [];
+    _extendQueue();
   }
 
-  static const int _repeatCount = 3;
-
-  void _loadDueCards() {
+  void _extendQueue() {
     final uniqueIds = widget.fsrs.config.cards
-        .where((card) => card.due.toLocal().isBefore(DateTime.now()))
+        .where((card) => card.due.toLocal().difference(DateTime.now()).inDays < 1)
         .map((card) => card.cardId)
         .toList();
-    // 交错顺序 [A,B,C, A,B,C, ...] — 每轮过完所有词再重复
-    dueCardIds = [
-      for (int i = 0; i < _repeatCount; i++)
-        ...uniqueIds
-    ];
+        
+    if (uniqueIds.isEmpty) return;
+    
+    // 按新设定：如果启用强化记忆，重复3次，否则仅1遍
+    if (widget.fsrs.config.reinforceMemory) {
+      queue.addAll([
+        for (int i = 0; i < 3; i++) ...uniqueIds
+      ]);
+    } else {
+      queue.addAll(uniqueIds);
+    }
   }
 
   void _refresh() {
     setState(() {
-      _loadDueCards();
-      // Jump back to first content page
-      controller.jumpToPage(1);
+      queue.clear();
+      _extendQueue();
     });
+    if (controller.hasClients) {
+      controller.jumpToPage(0);
+    }
   }
 
   @override
@@ -332,11 +369,8 @@ class _MainFSRSPageState extends State<MainFSRSPage> {
 
   @override
   Widget build(BuildContext context) {
-    context.read<Global>().uiLogger.info("构建 MainFSRSPage, 待复习: ${dueCardIds.length}");
+    context.read<Global>().uiLogger.info("构建 MainFSRSPage, 动态队列长度: ${queue.length}");
     MediaQueryData mediaQuery = MediaQuery.of(context);
-
-    // page 0: summary, pages 1..N: review cards, page N+1: done
-    final int totalPages = dueCardIds.isEmpty ? 1 : dueCardIds.length + 2;
 
     return Scaffold(
       appBar: AppBar(
@@ -344,7 +378,7 @@ class _MainFSRSPageState extends State<MainFSRSPage> {
         actions: [
           IconButton(
             icon: Icon(Icons.refresh),
-            tooltip: "刷新复习列表",
+            tooltip: "强制刷新",
             onPressed: _refresh,
           ),
           IconButton(
@@ -364,13 +398,12 @@ class _MainFSRSPageState extends State<MainFSRSPage> {
         scrollDirection: Axis.vertical,
         controller: controller,
         physics: const PageScrollPhysics(),
-        itemCount: totalPages,
         itemBuilder: (context, index) {
-          // Page 0: entry summary
+          // Page 0: 引导页
           if (index == 0) {
-            if (dueCardIds.isEmpty) {
+            if (queue.isEmpty) {
               return Center(
-                child: TextContainer(text: "当前无需要复习的内容\n点击右上角可修改配置"),
+                child: TextContainer(text: "当前无任何待复习的内容\n可以休息会儿或者去[学习推送]里加些新词"),
               );
             }
             return Center(
@@ -378,7 +411,7 @@ class _MainFSRSPageState extends State<MainFSRSPage> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   TextContainer(
-                    text: "你有${dueCardIds.length}个单词需要复习!\n上滑页面开始复习",
+                    text: "已载入待复习队列\n上滑页面开始复习",
                     size: Size(mediaQuery.size.width * 0.8, mediaQuery.size.height * 0.4),
                     textAlign: TextAlign.center,
                   ),
@@ -388,31 +421,41 @@ class _MainFSRSPageState extends State<MainFSRSPage> {
             );
           }
 
-          // Last page: completed
-          if (index == dueCardIds.length + 1) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  TextContainer(
-                    text: "本轮复习完成！\n如有新到期单词可点击右上角刷新",
-                    size: Size(mediaQuery.size.width * 0.8, mediaQuery.size.height * 0.4),
-                    textAlign: TextAlign.center,
-                  ),
-                  ElevatedButton.icon(
-                    onPressed: _refresh,
-                    icon: Icon(Icons.refresh),
-                    label: Text("刷新"),
-                  )
-                ],
-              ),
-            );
+          int arrayIndex = index - 1;
+
+          // 动态扩充：当滑到底时触发延展
+          if (arrayIndex >= queue.length) {
+            _extendQueue();
           }
 
-          // Review pages 1..N
-          final wordID = dueCardIds[index - 1];
+          // 扩充了还是不够，说明真的穷尽了
+          if (arrayIndex >= queue.length) {
+            if (arrayIndex == queue.length) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    TextContainer(
+                      text: "太棒了！当前没有任何卡片需要复习！\n若刚复习完请等待下一个间隔",
+                      size: Size(mediaQuery.size.width * 0.8, mediaQuery.size.height * 0.4),
+                      textAlign: TextAlign.center,
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: _refresh,
+                      icon: Icon(Icons.refresh),
+                      label: Text("全盘刷新"),
+                    )
+                  ],
+                ),
+              );
+            }
+            // 返回 null 阻断 PageView 继续下滑
+            return null;
+          }
+
+          // 常规复习页
           return FSRSReviewCardPage(
-            wordID: wordID,
+            wordID: queue[arrayIndex],
             fsrs: widget.fsrs,
             rnd: sharedRnd,
             controller: controller,
