@@ -552,6 +552,7 @@ class _FSRSReviewCardPage extends State<FSRSReviewCardPage> {
                     viewAnswer(context, wordData[widget.wordID]);
                     setState(() {
                       choosed = true;
+                      end = DateTime.now();
                     });
                   }, 
                   icon: Icon(Icons.tips_and_updates),
