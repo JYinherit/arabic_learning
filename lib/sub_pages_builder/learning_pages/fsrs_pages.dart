@@ -520,14 +520,14 @@ class _FSRSReviewCardPage extends State<FSRSReviewCardPage> {
           });
           context.read<Global>().updateLearningStreak();
           if(widget.fsrs.config.selfEvaluate) {
-            widget.fsrs.reviewCard(widget.wordID, end.difference(start).inMilliseconds, true, forceRate: (const [Rating.easy, Rating.good, Rating.hard, Rating.again]).elementAt(value));
+            widget.fsrs.produceCard(widget.wordID, forceRate: (const [Rating.easy, Rating.good, Rating.hard, Rating.again]).elementAt(value));
             return true;
           } else {
             if(correct == value) {
-              widget.fsrs.reviewCard(widget.wordID, end.difference(start).inMilliseconds, true);
+              widget.fsrs.produceCard(widget.wordID, duration: end.difference(start).inMilliseconds, isCorrect: true);
               return true;
             } else {
-              widget.fsrs.reviewCard(widget.wordID, end.difference(start).inMilliseconds, false);
+              widget.fsrs.produceCard(widget.wordID, duration: end.difference(start).inMilliseconds, isCorrect: false);
               return false;
             }
           }
@@ -679,7 +679,7 @@ class _FSRSLearningPageState extends State<FSRSLearningPage> {
                     setState(() {
                       corrected = true;
                     });
-                    widget.fsrs.addWordCard(widget.words[index].id);
+                    widget.fsrs.produceCard(widget.words[index].id);
                     return true;
                   } else {
                     return false;

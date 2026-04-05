@@ -45,16 +45,11 @@ class _InLearningPageState extends State<InLearningPage> {
     if(isCorrect) correctCount++;
     FSRS fsrs = FSRS();
     if(widget.countInReview && fsrs.config.enabled) {
-      if(fsrs.isContained(targetWord.id)){
-        if(isTypingQuestion) {
-          fsrs.reviewCard(targetWord.id, takentime, isCorrect, forceRate: isCorrect ? Rating.good : Rating.again);
-        } else {
-          fsrs.reviewCard(targetWord.id, takentime, isCorrect);
-        }
+      if(isTypingQuestion) {
+        fsrs.produceCard(targetWord.id, forceRate: isCorrect ? Rating.good : Rating.again);
       } else {
-        if(isCorrect) fsrs.addWordCard(targetWord.id);
+        fsrs.produceCard(targetWord.id, duration: takentime, isCorrect: isCorrect);
       }
-      
     }
   }
 

@@ -76,14 +76,26 @@ class FSRS {
     return config.cards[index].due.toLocal().difference(DateTime.now()).inDays;
   }
 
-  void reviewCard(int wordId, int duration, bool isCorrect, {Rating? forceRate}) {
+  void produceCard(int wordId, {int? duration, bool? isCorrect, Rating? forceRate}) {
     logger.fine("记录复习卡片: Id: $wordId; duration: $duration; isCorrect: $isCorrect");
     int index = config.cards.indexWhere((Card card) => card.cardId == wordId); // 避免有时候cardId != wordId
-    logger.fine("定位复习卡片地址: $index, 目前阶段: ${config.cards[index].step}, 难度: ${config.cards[index].difficulty}, 稳定: ${config.cards[index].stability}, 过期时间(+8): ${config.cards[index].due.toLocal()}");
-    final (:card, :reviewLog) = config.scheduler!.reviewCard(config.cards[index], forceRate ?? calculate(duration, isCorrect), reviewDateTime: DateTime.now().toUtc(), reviewDuration: duration);
-    config.cards[index] = card;
-    config.reviewLogs[index] = reviewLog;
-    logger.fine("卡片 $index 复习后: 目前阶段: ${config.cards[index].step}, 难度: ${config.cards[index].difficulty}, 稳定: ${config.cards[index].stability}, 过期时间(+8): ${config.cards[index].due.toLocal()}");
+    if(index == -1) {
+      // 卡片不存在 进行添加
+      logger.fine("添加复习卡片: Id: $wordId");
+      config.cards.add(Card(cardId: wordId, state: State.learning));
+      config.reviewLogs.add(ReviewLog(cardId: wordId, rating: Rating.good, reviewDateTime: DateTime.now()));
+    } else {
+      // 卡片存在 进行复习
+      if((duration == null || isCorrect == null) && forceRate == null) {
+        logger.shout("传入信息缺失: wordId: $wordId; duration: $duration; isCorrect: $isCorrect; forceRate: $forceRate");
+        return; // 避免错误信息导入
+      }
+      logger.fine("定位复习卡片地址: $index, 目前阶段: ${config.cards[index].step}, 难度: ${config.cards[index].difficulty}, 稳定: ${config.cards[index].stability}, 过期时间(+8): ${config.cards[index].due.toLocal()}");
+      final (:card, :reviewLog) = config.scheduler!.reviewCard(config.cards[index], forceRate ?? calculate(duration!, isCorrect!), reviewDateTime: DateTime.now().toUtc(), reviewDuration: duration);
+      config.cards[index] = card;
+      config.reviewLogs[index] = reviewLog;
+      logger.fine("卡片 $index 复习后: 目前阶段: ${config.cards[index].step}, 难度: ${config.cards[index].difficulty}, 稳定: ${config.cards[index].stability}, 过期时间(+8): ${config.cards[index].due.toLocal()}");
+    }
     save();
   }
 
@@ -112,21 +124,6 @@ class FSRS {
 
   bool isContained(int wordId) {
     return config.cards.any((Card card) => card.cardId == wordId);
-  }
-
-  void addWordCard(int wordId) {
-    logger.fine("添加复习卡片: Id: $wordId");
-    if(isContained(wordId)){
-      logger.fine("卡片 Id: $wordId 已存在，跳过重复添加");
-      return;
-    }
-    if (config.cards.isEmpty) {
-      config = config.copyWith(cards: [], reviewLogs: []);
-    }
-    // os the wordID == cardID
-    config.cards.add(Card(cardId: wordId, state: State.learning));
-    config.reviewLogs.add(ReviewLog(cardId: wordId, rating: Rating.good, reviewDateTime: DateTime.now()));
-    save();
   }
 
   Rating calculate(int duration, bool isCorrect) {
