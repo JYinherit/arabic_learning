@@ -320,28 +320,24 @@ class MainFSRSPage extends StatefulWidget {
 }
 
 class _MainFSRSPageState extends State<MainFSRSPage> {
-  late List<int> queue;
-  late final PageController controller;
-  late final Random sharedRnd;
+  List<int> queue = [];
+  final PageController controller = PageController();
+  final Random sharedRnd = Random();
 
   @override
   void initState() {
     super.initState();
-    controller = PageController();
-    sharedRnd = Random();
-    queue = [];
     _extendQueue();
   }
 
   void _extendQueue() {
-    final uniqueIds = widget.fsrs.config.cards
-        .where((card) => card.due.toLocal().difference(DateTime.now()).inDays < 1)
+    final List<int> uniqueIds = widget.fsrs.config.cards
+        .where((card) => widget.fsrs.willDueIn(card) < 1)
         .map((card) => card.cardId)
         .toList();
         
     if (uniqueIds.isEmpty) return;
     
-    // 按新设定：如果启用强化记忆，重复3次，否则仅1遍
     if (widget.fsrs.config.reinforceMemory) {
       queue.addAll([
         for (int i = 0; i < 3; i++) ...uniqueIds

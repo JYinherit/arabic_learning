@@ -72,16 +72,22 @@ class FSRS {
     save();
   }
 
-  int willDueIn(int index) {
-    return config.cards[index].due.toLocal().difference(DateTime.now()).inDays;
+  int willDueIn(Card card) {
+    return card.due.toLocal().difference(DateTime.now()).inDays;
   }
 
   void produceCard(int wordId, {int? duration, bool? isCorrect, Rating? forceRate}) {
-    logger.fine("记录复习卡片: Id: $wordId; duration: $duration; isCorrect: $isCorrect");
-    int index = config.cards.indexWhere((Card card) => card.cardId == wordId); // 避免有时候cardId != wordId
+    logger.fine("记录复习卡片: Id: $wordId; duration: $duration; isCorrect: $isCorrect; forceRate: $forceRate");
+    final int index = config.cards.indexWhere((Card card) => card.cardId == wordId);
     if(index == -1) {
       // 卡片不存在 进行添加
       logger.fine("添加复习卡片: Id: $wordId");
+      if(config.cards.isEmpty) {
+        config = config.copyWith(
+          cards: [],
+          reviewLogs: []
+        );
+      }
       config.cards.add(Card(cardId: wordId, state: State.learning));
       config.reviewLogs.add(ReviewLog(cardId: wordId, rating: Rating.good, reviewDateTime: DateTime.now()));
     } else {
@@ -101,8 +107,8 @@ class FSRS {
 
   int getWillDueCount() {
     int dueCards = 0;
-    for(int i = 0; i < config.cards.length; i++) {
-      if(willDueIn(i) < 1) {
+    for(Card card in config.cards) {
+      if(willDueIn(card) < 1) {
         dueCards++;
       }
     }
@@ -110,16 +116,16 @@ class FSRS {
   }
 
   int getLeastDueCard() {
-    int leastDueIndex = -1;
-    for(int i = 0; i < config.cards.length; i++) {
-      if(willDueIn(i) < 1) {
-        if(leastDueIndex == -1 || config.cards[i].due.toLocal().isBefore(config.cards[leastDueIndex].due.toLocal())) {
-          leastDueIndex = i;
+    Card? leastDueCard;
+    for(Card card in config.cards) {
+      if(willDueIn(card) < 1) {
+        if(leastDueCard == null || card.due.toLocal().isBefore(leastDueCard.due.toLocal())) {
+          leastDueCard = card;
         }
       }
     }
-    if (leastDueIndex == -1) return -1;
-    return config.cards[leastDueIndex].cardId;
+    if (leastDueCard == null) return -1;
+    return leastDueCard.cardId;
   }
 
   bool isContained(int wordId) {
@@ -181,7 +187,7 @@ class FSRSConfig {
     preferSimilar = preferSimilar??false,
     selfEvaluate = selfEvaluate??false,
     pushAmount = pushAmount??0,
-    reinforceMemory = reinforceMemory??true;
+    reinforceMemory = reinforceMemory??false;
   
   Map<String, dynamic> toMap(){
     return {
