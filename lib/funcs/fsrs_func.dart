@@ -29,6 +29,28 @@ class FSRS {
     } else {
       config = FSRSConfig.buildFromMap(jsonDecode(appData.storage.getString("fsrsData")!));
       logger.info("FSRS配置加载完成");
+      
+      // 清洗潜在的重复脏数据 (Deduplication)
+      final Set<int> seenIds = {};
+      final List<Card> uniqueCards = [];
+      final List<ReviewLog> uniqueLogs = [];
+      
+      for(int i = 0; i < config.cards.length; i++) {
+        final currentCardId = config.cards[i].cardId;
+        if(!seenIds.contains(currentCardId)) {
+          seenIds.add(currentCardId);
+          uniqueCards.add(config.cards[i]);
+          if(i < config.reviewLogs.length) {
+            uniqueLogs.add(config.reviewLogs[i]);
+          }
+        }
+      }
+      
+      if(uniqueCards.length < config.cards.length) {
+        logger.warning("发现并清理了 ${config.cards.length - uniqueCards.length} 条重复复习记录");
+        config = config.copyWith(cards: uniqueCards, reviewLogs: uniqueLogs);
+        save();
+      }
     }
     
     if(config.enabled) return true;
@@ -50,25 +72,43 @@ class FSRS {
     save();
   }
 
-  int willDueIn(int index) {
-    return config.cards[index].due.toLocal().difference(DateTime.now()).inDays;
+  int willDueIn(Card card) {
+    return card.due.toLocal().difference(DateTime.now()).inDays;
   }
 
-  void reviewCard(int wordId, int duration, bool isCorrect, {Rating? forceRate}) {
-    logger.fine("记录复习卡片: Id: $wordId; duration: $duration; isCorrect: $isCorrect");
-    int index = config.cards.indexWhere((Card card) => card.cardId == wordId); // 避免有时候cardId != wordId
-    logger.fine("定位复习卡片地址: $index, 目前阶段: ${config.cards[index].step}, 难度: ${config.cards[index].difficulty}, 稳定: ${config.cards[index].stability}, 过期时间(+8): ${config.cards[index].due.toLocal()}");
-    final (:card, :reviewLog) = config.scheduler!.reviewCard(config.cards[index], forceRate ?? calculate(duration, isCorrect), reviewDateTime: DateTime.now().toUtc(), reviewDuration: duration);
-    config.cards[index] = card;
-    config.reviewLogs[index] = reviewLog;
-    logger.fine("卡片 $index 复习后: 目前阶段: ${config.cards[index].step}, 难度: ${config.cards[index].difficulty}, 稳定: ${config.cards[index].stability}, 过期时间(+8): ${config.cards[index].due.toLocal()}");
+  void produceCard(int wordId, {int? duration, bool? isCorrect, Rating? forceRate}) {
+    logger.fine("记录复习卡片: Id: $wordId; duration: $duration; isCorrect: $isCorrect; forceRate: $forceRate");
+    final int index = config.cards.indexWhere((Card card) => card.cardId == wordId);
+    if(index == -1) {
+      // 卡片不存在 进行添加
+      logger.fine("添加复习卡片: Id: $wordId");
+      if(config.cards.isEmpty) {
+        config = config.copyWith(
+          cards: [],
+          reviewLogs: []
+        );
+      }
+      config.cards.add(Card(cardId: wordId, state: State.learning));
+      config.reviewLogs.add(ReviewLog(cardId: wordId, rating: Rating.good, reviewDateTime: DateTime.now()));
+    } else {
+      // 卡片存在 进行复习
+      if((duration == null || isCorrect == null) && forceRate == null) {
+        logger.shout("传入信息缺失: wordId: $wordId; duration: $duration; isCorrect: $isCorrect; forceRate: $forceRate");
+        return; // 避免错误信息导入
+      }
+      logger.fine("定位复习卡片地址: $index, 目前阶段: ${config.cards[index].step}, 难度: ${config.cards[index].difficulty}, 稳定: ${config.cards[index].stability}, 过期时间(+8): ${config.cards[index].due.toLocal()}");
+      final (:card, :reviewLog) = config.scheduler!.reviewCard(config.cards[index], forceRate ?? calculate(duration!, isCorrect!), reviewDateTime: DateTime.now().toUtc(), reviewDuration: duration);
+      config.cards[index] = card;
+      config.reviewLogs[index] = reviewLog;
+      logger.fine("卡片 $index 复习后: 目前阶段: ${config.cards[index].step}, 难度: ${config.cards[index].difficulty}, 稳定: ${config.cards[index].stability}, 过期时间(+8): ${config.cards[index].due.toLocal()}");
+    }
     save();
   }
 
   int getWillDueCount() {
     int dueCards = 0;
-    for(int i = 0; i < config.cards.length; i++) {
-      if(willDueIn(i) < 1) {
+    for(Card card in config.cards) {
+      if(willDueIn(card) < 1) {
         dueCards++;
       }
     }
@@ -76,30 +116,20 @@ class FSRS {
   }
 
   int getLeastDueCard() {
-    if (config.cards.isEmpty) return -1;
-    int leastDueIndex = 0;
-    for(int i = 1; i < config.cards.length; i++) {
-      if(config.cards[i].due.toLocal().isBefore(config.cards[leastDueIndex].due.toLocal()) && config.cards[i].due.toLocal().difference(DateTime.now()) < Duration(days: 1)) {
-        leastDueIndex = i;
+    Card? leastDueCard;
+    for(Card card in config.cards) {
+      if(willDueIn(card) < 1) {
+        if(leastDueCard == null || card.due.toLocal().isBefore(leastDueCard.due.toLocal())) {
+          leastDueCard = card;
+        }
       }
     }
-    if(config.cards[leastDueIndex].due.difference(DateTime.now()) > Duration(days: 1)) return -1;
-    return config.cards[leastDueIndex].cardId;
+    if (leastDueCard == null) return -1;
+    return leastDueCard.cardId;
   }
 
   bool isContained(int wordId) {
     return config.cards.any((Card card) => card.cardId == wordId);
-  }
-
-  void addWordCard(int wordId) {
-    logger.fine("添加复习卡片: Id: $wordId");
-    if (config.cards.isEmpty) {
-      config = config.copyWith(cards: [], reviewLogs: []);
-    }
-    // os the wordID == cardID
-    config.cards.add(Card(cardId: wordId, state: State.learning));
-    config.reviewLogs.add(ReviewLog(cardId: wordId, rating: Rating.good, reviewDateTime: DateTime.now()));
-    save();
   }
 
   Rating calculate(int duration, bool isCorrect) {
@@ -133,6 +163,7 @@ class FSRSConfig {
   final bool preferSimilar;
   final bool selfEvaluate;
   final int pushAmount;
+  final bool reinforceMemory;
 
   const FSRSConfig({
     bool? enabled,
@@ -144,7 +175,8 @@ class FSRSConfig {
     int? goodDuration,
     bool? preferSimilar,
     bool? selfEvaluate,
-    int? pushAmount
+    int? pushAmount,
+    bool? reinforceMemory
   }) :
     enabled = enabled??false,
     cards = cards??const [],
@@ -154,7 +186,8 @@ class FSRSConfig {
     goodDuration = goodDuration??6000,
     preferSimilar = preferSimilar??false,
     selfEvaluate = selfEvaluate??false,
-    pushAmount = pushAmount??0;
+    pushAmount = pushAmount??0,
+    reinforceMemory = reinforceMemory??false;
   
   Map<String, dynamic> toMap(){
     return {
@@ -167,7 +200,8 @@ class FSRSConfig {
       "goodDuration": goodDuration,
       "preferSimilar": preferSimilar,
       "selfEvaluate": selfEvaluate,
-      "pushAmount": pushAmount
+      "pushAmount": pushAmount,
+      "reinforceMemory": reinforceMemory
     };
   }
 
@@ -181,7 +215,8 @@ class FSRSConfig {
     int? goodDuration,
     bool? preferSimilar,
     bool? selfEvaluate,
-    int? pushAmount
+    int? pushAmount,
+    bool? reinforceMemory
   }) {
     return FSRSConfig(
       enabled: enabled??this.enabled,
@@ -193,7 +228,8 @@ class FSRSConfig {
       goodDuration: goodDuration??this.goodDuration,
       preferSimilar: preferSimilar??this.preferSimilar,
       selfEvaluate: selfEvaluate??this.selfEvaluate,
-      pushAmount: pushAmount??this.pushAmount
+      pushAmount: pushAmount??this.pushAmount,
+      reinforceMemory: reinforceMemory??this.reinforceMemory
     );
   }
 
@@ -209,7 +245,8 @@ class FSRSConfig {
         goodDuration: configData["goodDuration"],
         preferSimilar: configData["preferSimilar"],
         selfEvaluate: configData["selfEvaluate"],
-        pushAmount: configData["pushAmount"]
+        pushAmount: configData["pushAmount"],
+        reinforceMemory: configData["reinforceMemory"]
       );
     }
     return FSRSConfig(enabled: false);

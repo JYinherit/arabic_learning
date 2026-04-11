@@ -229,6 +229,36 @@ class ForeFSRSSettingPage extends StatelessWidget {
                   ],
                 ),
               ),
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: StaticsVar.br,
+                  color: Theme.of(context).colorScheme.onPrimary
+                ),
+                margin: EdgeInsets.all(8.0),
+                padding: EdgeInsets.all(8.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(child: Text("强化记忆循环", style: Theme.of(context).textTheme.bodyLarge)),
+                        Switch(
+                          value: fsrs.config.reinforceMemory, 
+                          onChanged: (value){
+                            setState(() {
+                              fsrs.config = fsrs.config.copyWith(
+                                reinforceMemory: value
+                              );
+                            });
+                          }
+                        )
+                      ],
+                    ),
+                    Text("开启后同一个到期卡片在队列中将按交错顺序出现多次（3次），加深印象。"),
+                    Text("关闭后每个词汇当次复习只在队列里出现一次。")
+                  ],
+                ),
+              ),
               ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
                   fixedSize: Size.fromHeight(100),
@@ -281,25 +311,77 @@ class ForeFSRSSettingPage extends StatelessWidget {
   }
 }
 
-class MainFSRSPage extends StatelessWidget {
+class MainFSRSPage extends StatefulWidget {
   final FSRS fsrs;
   const MainFSRSPage({super.key, required this.fsrs});
-  
+
+  @override
+  State<MainFSRSPage> createState() => _MainFSRSPageState();
+}
+
+class _MainFSRSPageState extends State<MainFSRSPage> {
+  List<int> queue = [];
+  final PageController controller = PageController();
+  final Random sharedRnd = Random();
+
+  @override
+  void initState() {
+    super.initState();
+    _extendQueue();
+  }
+
+  void _extendQueue() {
+    final List<int> uniqueIds = widget.fsrs.config.cards
+        .where((card) => widget.fsrs.willDueIn(card) < 1)
+        .map((card) => card.cardId)
+        .toList();
+        
+    if (uniqueIds.isEmpty) return;
+    
+    if (widget.fsrs.config.reinforceMemory) {
+      queue.addAll([
+        for (int i = 0; i < 3; i++) ...uniqueIds
+      ]);
+    } else {
+      queue.addAll(uniqueIds);
+    }
+  }
+
+  void _refresh() {
+    setState(() {
+      queue.clear();
+      _extendQueue();
+    });
+    if (controller.hasClients) {
+      controller.jumpToPage(0);
+    }
+  }
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    context.read<Global>().uiLogger.info("构建 MainFSRSPage");
+    context.read<Global>().uiLogger.info("构建 MainFSRSPage, 动态队列长度: ${queue.length}");
     MediaQueryData mediaQuery = MediaQuery.of(context);
-    final PageController controller = PageController();
-    Random sharedRnd = Random();
+
     return Scaffold(
       appBar: AppBar(
         title: const Text("规律学习"),
         actions: [
           IconButton(
+            icon: Icon(Icons.refresh),
+            tooltip: "强制刷新",
+            onPressed: _refresh,
+          ),
+          IconButton(
             icon: Icon(Icons.keyboard_option_key),
             onPressed: () {
               showModalBottomSheet(
-                context: context, 
+                context: context,
                 isScrollControlled: true,
                 enableDrag: false,
                 builder: (context) => ForeFSRSSettingPage(forceChoosing: true)
@@ -311,24 +393,69 @@ class MainFSRSPage extends StatelessWidget {
       body: PageView.builder(
         scrollDirection: Axis.vertical,
         controller: controller,
+        physics: const PageScrollPhysics(),
         itemBuilder: (context, index) {
-          final wordID = fsrs.getLeastDueCard();
-          if(wordID == -1) {
-            return Center(
-              child: TextContainer(text: "当前无需要复习的内容\n点击右上角可修改配置"),
-            );
-          }
-          if(index == 0) {
+          // Page 0: 引导页
+          if (index == 0) {
+            if (queue.isEmpty) {
+              return Center(
+                child: TextContainer(text: "当前无任何待复习的内容\n可以休息会儿或者去[学习推送]里加些新词"),
+              );
+            }
             return Center(
               child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  TextContainer(text: "你有${fsrs.getWillDueCount().toString()}个单词需要复习!\n上滑页面开始复习",size: Size(mediaQuery.size.width * 0.8, mediaQuery.size.height * 0.4),textAlign: TextAlign.center),
+                  TextContainer(
+                    text: "已载入待复习队列\n上滑页面开始复习",
+                    size: Size(mediaQuery.size.width * 0.8, mediaQuery.size.height * 0.4),
+                    textAlign: TextAlign.center,
+                  ),
                   Icon(Icons.arrow_upward, size: 48.0, color: Colors.grey)
                 ],
               ),
             );
           }
-          return FSRSReviewCardPage(wordID: wordID, fsrs: fsrs, rnd: sharedRnd, controller: controller,);
+
+          int arrayIndex = index - 1;
+
+          // 动态扩充：当滑到底时触发延展
+          if (arrayIndex >= queue.length) {
+            _extendQueue();
+          }
+
+          // 扩充了还是不够，说明真的穷尽了
+          if (arrayIndex >= queue.length) {
+            if (arrayIndex == queue.length) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    TextContainer(
+                      text: "太棒了！当前没有任何卡片需要复习！\n若刚复习完请等待下一个间隔",
+                      size: Size(mediaQuery.size.width * 0.8, mediaQuery.size.height * 0.4),
+                      textAlign: TextAlign.center,
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: _refresh,
+                      icon: Icon(Icons.refresh),
+                      label: Text("全盘刷新"),
+                    )
+                  ],
+                ),
+              );
+            }
+            // 返回 null 阻断 PageView 继续下滑
+            return null;
+          }
+
+          // 常规复习页
+          return FSRSReviewCardPage(
+            wordID: queue[arrayIndex],
+            fsrs: widget.fsrs,
+            rnd: sharedRnd,
+            controller: controller,
+          );
         }
       )
     );
@@ -389,14 +516,14 @@ class _FSRSReviewCardPage extends State<FSRSReviewCardPage> {
           });
           context.read<Global>().updateLearningStreak();
           if(widget.fsrs.config.selfEvaluate) {
-            widget.fsrs.reviewCard(widget.wordID, end.difference(start).inMilliseconds, true, forceRate: (const [Rating.easy, Rating.good, Rating.hard, Rating.again]).elementAt(value));
+            widget.fsrs.produceCard(widget.wordID, forceRate: (const [Rating.easy, Rating.good, Rating.hard, Rating.again]).elementAt(value));
             return true;
           } else {
             if(correct == value) {
-              widget.fsrs.reviewCard(widget.wordID, end.difference(start).inMilliseconds, true);
+              widget.fsrs.produceCard(widget.wordID, duration: end.difference(start).inMilliseconds, isCorrect: true);
               return true;
             } else {
-              widget.fsrs.reviewCard(widget.wordID, end.difference(start).inMilliseconds, false);
+              widget.fsrs.produceCard(widget.wordID, duration: end.difference(start).inMilliseconds, isCorrect: false);
               return false;
             }
           }
@@ -548,7 +675,7 @@ class _FSRSLearningPageState extends State<FSRSLearningPage> {
                     setState(() {
                       corrected = true;
                     });
-                    widget.fsrs.addWordCard(widget.words[index].id);
+                    widget.fsrs.produceCard(widget.words[index].id);
                     return true;
                   } else {
                     return false;
