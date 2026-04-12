@@ -941,6 +941,12 @@ class _SpellQuestion extends State<SpellQuestion> {
   }
 
   @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     context.read<Global>().uiLogger.info("构建拼写题页面，主单词: ${widget.word.arabic}");
     MediaQueryData mediaQuery = MediaQuery.of(context);

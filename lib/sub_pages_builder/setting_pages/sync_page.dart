@@ -354,7 +354,12 @@ Future<void> popAccountSetting(BuildContext context) async {
             child: Text("清空"),
           ),
           ElevatedButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              uriController.dispose();
+              accountController.dispose();
+              passwdController.dispose();
+              Navigator.pop(context);
+            },
             child: Text("取消"),
           ),
           ElevatedButton(
@@ -376,6 +381,9 @@ Future<void> popAccountSetting(BuildContext context) async {
                 )
               );
               context.read<Global>().updateSetting();
+              uriController.dispose();
+              accountController.dispose();
+              passwdController.dispose();
               Navigator.pop(context);
             }, 
             child: Text("确认")

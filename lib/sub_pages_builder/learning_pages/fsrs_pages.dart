@@ -603,6 +603,14 @@ class _FSRSLearningPageState extends State<FSRSLearningPage> {
   }
 
   @override
+  void dispose() {
+    controllerHor.dispose();
+    controllerLearning.dispose();
+    controllerQuestions.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     MediaQueryData mediaQuery = MediaQuery.of(context);
     if(widget.words.isEmpty) {
