@@ -3,6 +3,7 @@ import 'package:arabic_learning/funcs/utili.dart';
 import 'package:arabic_learning/vars/global.dart';
 import 'package:arabic_learning/vars/license_storage.dart';
 import 'package:arabic_learning/vars/statics_var.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
@@ -26,7 +27,7 @@ class _ModelDownload extends State<ModelDownload> {
 
   @override
   Widget build(BuildContext context) {
-    context.read<Global>().uiLogger.info("构建 ModelDownload");
+    // context.read<Global>().uiLogger.info("构建 ModelDownload");
     return Scaffold(
       appBar: AppBar(
         title: const Text('模型下载'),
@@ -76,7 +77,20 @@ class _ModelDownload extends State<ModelDownload> {
               setState(() {
                 progress = 3;
               });
-              await extractTarBz2('${basePath.path}/arabicLearning/tts/temp.tar.bz2', "${basePath.path}/arabicLearning/tts/model/");
+              try{
+                final String inputPath = '${basePath.path}/arabicLearning/tts/temp.tar.bz2';
+                final String outputPath = "${basePath.path}/arabicLearning/tts/model/";
+                await compute(extractTarBz2, (inputPath, outputPath));
+              } catch (e) {
+                if(!context.mounted) return;
+                context.read<Global>().uiLogger.severe("解压发生错误: $e");
+                alart(context, "解压发生错误: $e");
+                setState(() {
+                  progress = 0;
+                  isDownloading = false;
+                });
+                return;
+              }
               if(!context.mounted) return;
               AppData().loadTTS(AppData().config.audio.playRate);
               context.read<Global>().uiLogger.info("模型下载完成");
