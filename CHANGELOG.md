@@ -9,6 +9,7 @@
 ### Improvement
 
 - 优化了FSRS学习机制
+- 听写界面不熄屏
 
 ### Fix
 

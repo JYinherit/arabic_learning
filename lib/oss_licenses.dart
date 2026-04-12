@@ -94,6 +94,8 @@ const allDependencies = <Package>[
   _node_preamble,
   _objective_c,
   _package_config,
+  _package_info_plus,
+  _package_info_plus_platform_interface,
   _pana,
   _path,
   _path_provider,
@@ -163,6 +165,8 @@ const allDependencies = <Package>[
   _uuid,
   _vector_math,
   _vm_service,
+  _wakelock_plus,
+  _wakelock_plus_platform_interface,
   _watcher,
   _web,
   _web_socket,
@@ -210,7 +214,8 @@ const dependencies = <Package>[
   _qr_flutter,
   _mobile_scanner,
   _cupertino_icons,
-  _bk_tree
+  _bk_tree,
+  _wakelock_plus
 ];
 
 /// Direct `dev_dependencies`.
@@ -2232,13 +2237,13 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.''',
   );
 
-/// flutter 3.41.4
+/// flutter 3.41.6
 const _flutter = Package(
     name: 'flutter',
     description: 'A framework for writing Flutter applications',
     homepage: 'https://flutter.dev',
     authors: [],
-    version: '3.41.4',
+    version: '3.41.6',
     spdxIdentifiers: ['BSD-3-Clause'],
     isMarkdown: false,
     isSdk: true,
@@ -4920,6 +4925,90 @@ met:
     * Neither the name of Google LLC nor the names of its
       contributors may be used to endorse or promote products derived
       from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.''',
+  );
+
+/// package_info_plus 9.0.1
+const _package_info_plus = Package(
+    name: 'package_info_plus',
+    description: 'Flutter plugin for querying information about the application package, such as CFBundleVersion on iOS or versionCode on Android.',
+    homepage: 'https://github.com/fluttercommunity/plus_plugins',
+    repository: 'https://github.com/fluttercommunity/plus_plugins/tree/main/packages/package_info_plus/package_info_plus',
+    authors: [],
+    version: '9.0.1',
+    spdxIdentifiers: ['BSD-3-Clause'],
+    isMarkdown: false,
+    isSdk: false,
+    dependencies: [PackageRef('ffi'), PackageRef('flutter'), PackageRef('flutter_web_plugins'), PackageRef('http'), PackageRef('meta'), PackageRef('path'), PackageRef('package_info_plus_platform_interface'), PackageRef('web'), PackageRef('win32'), PackageRef('clock')],
+    devDependencies: [PackageRef('flutter_lints'), PackageRef('flutter_test'), PackageRef('test')],
+    license: '''Copyright 2017 The Chromium Authors. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+   * Redistributions of source code must retain the above copyright
+notice, this list of conditions and the following disclaimer.
+   * Redistributions in binary form must reproduce the above
+copyright notice, this list of conditions and the following disclaimer
+in the documentation and/or other materials provided with the
+distribution.
+   * Neither the name of Google Inc. nor the names of its
+contributors may be used to endorse or promote products derived from
+this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.''',
+  );
+
+/// package_info_plus_platform_interface 3.2.1
+const _package_info_plus_platform_interface = Package(
+    name: 'package_info_plus_platform_interface',
+    description: 'A common platform interface for the package_info_plus plugin.',
+    homepage: 'https://github.com/fluttercommunity/plus_plugins',
+    repository: 'https://github.com/fluttercommunity/plus_plugins/tree/main/packages/',
+    authors: [],
+    version: '3.2.1',
+    spdxIdentifiers: ['BSD-3-Clause'],
+    isMarkdown: false,
+    isSdk: false,
+    dependencies: [PackageRef('flutter'), PackageRef('meta'), PackageRef('plugin_platform_interface')],
+    devDependencies: [PackageRef('flutter_test'), PackageRef('flutter_lints')],
+    license: '''Copyright 2017 The Chromium Authors. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+   * Redistributions of source code must retain the above copyright
+notice, this list of conditions and the following disclaimer.
+   * Redistributions in binary form must reproduce the above
+copyright notice, this list of conditions and the following disclaimer
+in the documentation and/or other materials provided with the
+distribution.
+   * Neither the name of Google Inc. nor the names of its
+contributors may be used to endorse or promote products derived from
+this software without specific prior written permission.
 
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
 "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
@@ -39942,6 +40031,92 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.''',
   );
 
+/// wakelock_plus 1.5.1
+const _wakelock_plus = Package(
+    name: 'wakelock_plus',
+    description: 'Plugin that allows you to keep the device screen awake, i.e. prevent the screen from sleeping on Android, iOS, macOS, Windows, Linux, and web.',
+    repository: 'https://github.com/fluttercommunity/wakelock_plus/tree/main/wakelock_plus',
+    authors: [],
+    version: '1.5.1',
+    spdxIdentifiers: ['BSD-3-Clause'],
+    isMarkdown: false,
+    isSdk: false,
+    dependencies: [PackageRef('flutter'), PackageRef('flutter_web_plugins'), PackageRef('meta'), PackageRef('wakelock_plus_platform_interface'), PackageRef('win32'), PackageRef('dbus'), PackageRef('package_info_plus'), PackageRef('web')],
+    devDependencies: [PackageRef('flutter_test'), PackageRef('flutter_lints')],
+    license: '''BSD 3-Clause License
+
+Copyright (c) 2020-2023, creativecreatorormaybenot
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+
+3. Neither the name of the copyright holder nor the names of its
+   contributors may be used to endorse or promote products derived from
+   this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.''',
+  );
+
+/// wakelock_plus_platform_interface 1.4.0
+const _wakelock_plus_platform_interface = Package(
+    name: 'wakelock_plus_platform_interface',
+    description: 'A common platform interface for the wakelock_plus plugin used by the different platform implementations.',
+    repository: 'https://github.com/fluttercommunity/wakelock_plus/tree/main/wakelock_plus_platform_interface',
+    authors: [],
+    version: '1.4.0',
+    spdxIdentifiers: ['BSD-3-Clause'],
+    isMarkdown: false,
+    isSdk: false,
+    dependencies: [PackageRef('flutter'), PackageRef('plugin_platform_interface'), PackageRef('meta')],
+    devDependencies: [PackageRef('flutter_test'), PackageRef('flutter_lints')],
+    license: '''BSD 3-Clause License
+
+Copyright (c) 2020-2023, creativecreatorormaybenot
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+
+3. Neither the name of the copyright holder nor the names of its
+   contributors may be used to endorse or promote products derived from
+   this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.''',
+  );
+
 /// watcher 1.2.1
 const _watcher = Package(
     name: 'watcher',
@@ -40572,7 +40747,7 @@ const _arabic_learning = Package(
     spdxIdentifiers: ['AGPL-3.0'],
     isMarkdown: false,
     isSdk: false,
-    dependencies: [PackageRef('flutter'), PackageRef('window_manager'), PackageRef('path_provider'), PackageRef('provider'), PackageRef('file_picker'), PackageRef('flutter_tts'), PackageRef('just_audio'), PackageRef('just_audio_windows'), PackageRef('flutter_launcher_icons'), PackageRef('shared_preferences'), PackageRef('url_launcher'), PackageRef('sherpa_onnx'), PackageRef('archive'), PackageRef('dio'), PackageRef('fsrs'), PackageRef('idb_shim'), PackageRef('flutter_markdown_plus'), PackageRef('webdav_client'), PackageRef('logging'), PackageRef('flutter_local_notifications'), PackageRef('workmanager'), PackageRef('flutter_webrtc'), PackageRef('network_info_plus'), PackageRef('crypto'), PackageRef('qr_flutter'), PackageRef('mobile_scanner'), PackageRef('cupertino_icons'), PackageRef('bk_tree')],
+    dependencies: [PackageRef('flutter'), PackageRef('window_manager'), PackageRef('path_provider'), PackageRef('provider'), PackageRef('file_picker'), PackageRef('flutter_tts'), PackageRef('just_audio'), PackageRef('just_audio_windows'), PackageRef('flutter_launcher_icons'), PackageRef('shared_preferences'), PackageRef('url_launcher'), PackageRef('sherpa_onnx'), PackageRef('archive'), PackageRef('dio'), PackageRef('fsrs'), PackageRef('idb_shim'), PackageRef('flutter_markdown_plus'), PackageRef('webdav_client'), PackageRef('logging'), PackageRef('flutter_local_notifications'), PackageRef('workmanager'), PackageRef('flutter_webrtc'), PackageRef('network_info_plus'), PackageRef('crypto'), PackageRef('qr_flutter'), PackageRef('mobile_scanner'), PackageRef('cupertino_icons'), PackageRef('bk_tree'), PackageRef('wakelock_plus')],
     devDependencies: [PackageRef('flutter_test'), PackageRef('flutter_lints'), PackageRef('change_app_package_name'), PackageRef('dart_pubspec_licenses')],
     license: '''GNU AFFERO GENERAL PUBLIC LICENSE
                        Version 3, 19 November 2007
