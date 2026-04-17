@@ -887,28 +887,96 @@ class WordLookupLayout extends StatelessWidget {
   Widget build(BuildContext context) {
     if(lookfor.isEmpty) return SizedBox();
     MediaQueryData mediaQuery = MediaQuery.of(context);
-    List<WordItem> match = [];
-    if(lookfor.isArabic()) {
-      match.addAll(BKSearch.search(
-        WordItem(arabic: lookfor, chinese: lookfor, explanation: "", id: 0, className: ""), 
-        threshold: 4~/(lookfor.length * 0.5 + 1) // 输入越多 容差越小
-      )); // 从BK树找
+    
+    int forceColumn = AppData().config.learning.overviewForceColumn;
+    int crossAxisCount = forceColumn == 0 ? (mediaQuery.size.width ~/ 300) : forceColumn;
+    if (crossAxisCount <= 0) crossAxisCount = 1;
+    double itemWidth = mediaQuery.size.width / crossAxisCount;
 
+    if(lookfor.isArabic()) {
+      WordItem dummyWord = WordItem(arabic: lookfor, chinese: lookfor, explanation: "", id: 0, className: "");
+      
+      Map<int, List<WordItem>> tiers = BKSearch.searchWithTiers(dummyWord);
+      
+      List<WordItem> exactMatches = [];
+      String lookforClean = lookfor.removeAracicExtensionPart();
       for(WordItem word in AppData().wordData.words) {
-        if(match.contains(word)) continue;
-        if(word.arabic.removeAracicExtensionPart().contains(lookfor.removeAracicExtensionPart())) {
-          match.add(word);
-          continue;
-        }
-        if(lookfor.length >=3 && getLevenshtein(lookfor.removeAracicExtensionPart(), word.arabic.removeAracicExtensionPart()) < 6~/(lookfor.length * 0.5 + 1)) {
-          match.add(word);
-          continue;
+        if(word.arabic.removeAracicExtensionPart().contains(lookforClean)) {
+          exactMatches.add(word);
         }
       }
-      match.sort((WordItem a, WordItem b) => 
-        getLevenshtein(lookfor.removeAracicExtensionPart(), a.arabic.removeAracicExtensionPart()) - getLevenshtein(lookfor.removeAracicExtensionPart(), b.arabic.removeAracicExtensionPart())
+      
+      for(int i = 1; i <= 4; i++) {
+        tiers[i]?.removeWhere((w) => exactMatches.contains(w));
+      }
+      
+      List<Map<String, dynamic>> sections = [];
+      if(exactMatches.isNotEmpty) {
+        sections.add({"title": "完全匹配/包含", "items": exactMatches});
+      }
+      if(tiers[1] != null && tiers[1]!.isNotEmpty) {
+        sections.add({"title": "极高相似 (同根同词性)", "items": tiers[1]!});
+      }
+      if(tiers[2] != null && tiers[2]!.isNotEmpty) {
+        sections.add({"title": "较高相似 (近根同词性)", "items": tiers[2]!});
+      }
+      if(tiers[3] != null && tiers[3]!.isNotEmpty) {
+        sections.add({"title": "中等相似 (同根异性)", "items": tiers[3]!});
+      }
+      if(tiers[4] != null && tiers[4]!.isNotEmpty) {
+        sections.add({"title": "近似词汇 (近根干扰项)", "items": tiers[4]!});
+      }
+
+      int totalMatches = sections.fold(0, (sum, sec) => sum + (sec["items"] as List).length);
+
+      if(!AppData().config.learning.wordLookupRealtime){
+        Future.delayed(Durations.medium1, () {
+          if(context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text("检索到$totalMatches个结果"), duration: Duration(seconds: 1),),
+            );
+          }
+        }); 
+      }
+
+      return CustomScrollView(
+        slivers: sections.map((section) {
+          String title = section["title"];
+          List<WordItem> items = section["items"];
+          
+          return [
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
+                child: Text(
+                  title,
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary),
+                ),
+              ),
+            ),
+            SliverGrid(
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: crossAxisCount),
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  return Container(
+                    margin: EdgeInsets.all(8.0),
+                    child: WordCard(
+                      word: items[index],
+                      useMask: false,
+                      width: itemWidth,
+                      height: itemWidth,
+                    ),
+                  );
+                },
+                childCount: items.length,
+              ),
+            ),
+          ];
+        }).expand((element) => element).toList(),
       );
+
     } else {
+      List<WordItem> match = [];
       for(WordItem word in AppData().wordData.words) {
         if(match.contains(word)) continue;
         if(word.chinese.contains(lookfor)) {
@@ -922,35 +990,50 @@ class WordLookupLayout extends StatelessWidget {
         }
       }
       match.sort((WordItem a, WordItem b) => 
-        a.chinese.contains(lookfor) ? -1 : a.chinese.contains(lookfor) ? 1 : getLevenshtein(lookfor, a.chinese) - getLevenshtein(lookfor, b.chinese)
+        a.chinese.contains(lookfor) ? -1 : (b.chinese.contains(lookfor) ? 1 : getLevenshtein(lookfor, a.chinese) - getLevenshtein(lookfor, b.chinese))
+      );
+
+      context.read<Global>().uiLogger.finer("单词检索结果: $match");
+      if(!AppData().config.learning.wordLookupRealtime){
+        Future.delayed(Durations.medium1, () {
+          if(context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text("检索到${match.length}个结果"), duration: Duration(seconds: 1),),
+            );
+          }
+        }); 
+      }
+
+      return CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
+              child: Text(
+                "中文检索结果",
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary),
+              ),
+            ),
+          ),
+          SliverGrid(
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: crossAxisCount),
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                return Container(
+                  margin: EdgeInsets.all(8.0),
+                  child: WordCard(
+                    word: match[index],
+                    useMask: false,
+                    width: itemWidth,
+                    height: itemWidth,
+                  ),
+                );
+              },
+              childCount: match.length,
+            ),
+          ),
+        ]
       );
     }
-    
-    context.read<Global>().uiLogger.finer("单词检索结果: $match");
-    if(!AppData().config.learning.wordLookupRealtime){
-      Future.delayed(Durations.medium1, () {
-        if(context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("检索到${match.length}个结果"), duration: Duration(seconds: 1),),
-          );
-        }
-      }); 
-    }
-
-    return GridView.builder(
-      itemCount: match.length,
-      gridDelegate: AppData().config.learning.overviewForceColumn == 0 ? SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: mediaQuery.size.width ~/ 300) : SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: AppData().config.learning.overviewForceColumn), 
-      itemBuilder: (context, index) {
-        return Container(
-          margin: EdgeInsets.all(8.0),
-          child: WordCard(
-            word: match[index],
-            useMask: false,
-            width: mediaQuery.size.width / (AppData().config.learning.overviewForceColumn == 0 ? (mediaQuery.size.width ~/ 300) : AppData().config.learning.overviewForceColumn),
-            height: mediaQuery.size.width / (AppData().config.learning.overviewForceColumn == 0 ? (mediaQuery.size.width ~/ 300) : AppData().config.learning.overviewForceColumn),
-          ),
-        );
-      }
-    );
   }
 }
