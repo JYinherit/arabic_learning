@@ -85,6 +85,12 @@ class _InLearningPageState extends State<InLearningPage> {
   }
 
   @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     context.read<Global>().uiLogger.info("构建 InLearningPage");
     final mediaQuery = MediaQuery.of(context);
@@ -622,6 +628,12 @@ class _WordCardOverViewPage extends State<WordCardOverViewPage> {
   bool inSearch = false;
 
   @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     context.read<Global>().uiLogger.info("构建 WordCardOverViewPage: inSearch{$inSearch}");
     MediaQueryData mediaQuery = MediaQuery.of(context);
@@ -780,6 +792,13 @@ class _WordCardOverViewLayout extends State<WordCardOverViewLayout> {
   final ScrollController classController = ScrollController();
   bool allowJsonScorll = true;
   bool allowClassScorll = false;
+
+  @override
+  void dispose(){
+    jsonController.dispose();
+    classController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {

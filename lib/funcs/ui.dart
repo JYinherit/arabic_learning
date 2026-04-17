@@ -445,16 +445,24 @@ class _ChooseButtonBoxState extends State<ChooseButtonBox> {
           setState(() {
             bool? ans = widget.chose(widget.index);
             if(ans != null) {
-              color = Colors.amber;
-              Future.delayed(widget.isAnimated ? Durations.medium4 : Duration(), (){
-                setState(() {
-                  if(ans) {
-                    color = Colors.greenAccent;
-                  } else {
-                    color = Colors.redAccent;
-                  }
+              if(widget.isAnimated) {
+                color = Colors.amber;
+                Future.delayed(Durations.medium4, (){
+                  setState(() {
+                    if(ans) {
+                      color = Colors.greenAccent;
+                    } else {
+                      color = Colors.redAccent;
+                    }
+                  });
                 });
-              });
+              } else {
+                if(ans) {
+                  color = Colors.greenAccent;
+                } else {
+                  color = Colors.redAccent;
+                }
+              }
             } else {
               color = Theme.of(context).colorScheme.onPrimary.withAlpha(150);
             }
@@ -930,6 +938,12 @@ class _SpellQuestion extends State<SpellQuestion> {
         cl = Colors.redAccent;
       }
     });
+  }
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
   }
 
   @override

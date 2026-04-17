@@ -199,7 +199,7 @@ class _DataSyncPage extends State<DataSyncPage> {
                   ElevatedButton(
                     onPressed: () async {
                       try{
-                        if(await FilePicker.platform.saveFile(
+                        if(await FilePicker.saveFile(
                           dialogTitle: "导出数据",
                           lockParentWindow: true,
                           fileName: "export.json",
@@ -240,7 +240,7 @@ class _DataSyncPage extends State<DataSyncPage> {
                   ElevatedButton(
                     onPressed: () async {
                       context.read<Global>().uiLogger.info("导入软件数据");
-                      FilePickerResult? result = await FilePicker.platform.pickFiles(
+                      FilePickerResult? result = await FilePicker.pickFiles(
                         allowMultiple: false,
                         type: FileType.custom,
                         allowedExtensions: ['json'],
@@ -354,7 +354,12 @@ Future<void> popAccountSetting(BuildContext context) async {
             child: Text("清空"),
           ),
           ElevatedButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              uriController.dispose();
+              accountController.dispose();
+              passwdController.dispose();
+              Navigator.pop(context);
+            },
             child: Text("取消"),
           ),
           ElevatedButton(
@@ -376,6 +381,9 @@ Future<void> popAccountSetting(BuildContext context) async {
                 )
               );
               context.read<Global>().updateSetting();
+              uriController.dispose();
+              accountController.dispose();
+              passwdController.dispose();
               Navigator.pop(context);
             }, 
             child: Text("确认")

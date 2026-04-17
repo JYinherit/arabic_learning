@@ -6,6 +6,7 @@ import 'package:arabic_learning/vars/statics_var.dart';
 import 'package:arabic_learning/vars/global.dart';
 import 'package:arabic_learning/funcs/ui.dart';
 import 'package:arabic_learning/funcs/utili.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 class ForeListeningSettingPage extends StatefulWidget {
   const ForeListeningSettingPage({super.key});
@@ -247,6 +248,19 @@ class _MainListeningPageState extends State<MainListeningPage> {
   // 1: 播放中
   // 2: 听写完成
   // 3: 答案页面
+
+  @override
+  void initState() {
+    WakelockPlus.enable();
+    super.initState();
+  }
+
+  @override
+  void dispose() {
+    WakelockPlus.disable();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     context.read<Global>().uiLogger.info("构建 MainListeningPage");

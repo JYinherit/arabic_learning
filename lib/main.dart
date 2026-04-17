@@ -259,6 +259,13 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   @override
+  void dispose(){
+    _pageController.dispose();
+    controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     context.read<Global>().uiLogger.fine("构建 MyHomePage");
     final global = context.watch<Global>();

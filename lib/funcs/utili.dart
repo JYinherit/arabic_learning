@@ -124,7 +124,10 @@ int calculateButtonBoxLayout(List<String> possible, double width){
   }
 }
 
-Future<void> extractTarBz2(String inputPath, String outputDir) async {
+@pragma('vm:entry-point') 
+void extractTarBz2((String inputPath, String outputPath) args) async {
+  final inputPath = args.$1;
+  final outputDir = args.$2;
   final bytes = await io.File(inputPath).readAsBytes();
 
   // 解压 bz2
@@ -136,7 +139,7 @@ Future<void> extractTarBz2(String inputPath, String outputDir) async {
 
   // 解出文件
   for (final file in tarArchive.files) {
-    final filePath = '$outputDir/${io.Platform.pathSeparator}${file.name}';
+    final filePath = '$outputDir${io.Platform.pathSeparator}${file.name}';
     if (file.isFile) {
       final outFile = io.File(filePath);
       await outFile.create(recursive: true);

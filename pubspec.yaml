@@ -33,7 +33,7 @@ dependencies:
   window_manager: ^0.5.1 #no support [android,iOS,Web] acceptable 
   path_provider: ^2.1.5 #no support [Web] UNacceptable
   provider: ^6.0.1
-  file_picker: ^10.3.3 #no completely support [Web] UNacceptable
+  file_picker: ^11.0.2 #no completely support [Web] UNacceptable
   flutter_tts: ^4.2.5
   just_audio: ^0.10.5
   just_audio_windows: ^0.2.2 #just_audio's windows addon
@@ -57,6 +57,7 @@ dependencies:
   mobile_scanner: ^7.2.0
   cupertino_icons: ^1.0.8
   bk_tree: ^0.1.2
+  wakelock_plus: ^1.5.1
 
 dev_dependencies:
   flutter_test:
@@ -69,7 +70,7 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
   change_app_package_name: ^1.1.0
-  dart_pubspec_licenses: ^3.0.15
+  dart_pubspec_licenses: ^3.2.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

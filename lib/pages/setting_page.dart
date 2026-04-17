@@ -221,7 +221,7 @@ class _SettingPage extends State<SettingPage> {
                 ),
                 onPressed: () async {
                   context.read<Global>().uiLogger.info("选择手动导入单词");
-                  FilePickerResult? result = await FilePicker.platform.pickFiles(
+                  FilePickerResult? result = await FilePicker.pickFiles(
                     allowMultiple: false,
                     type: FileType.custom,
                     allowedExtensions: ['json'],

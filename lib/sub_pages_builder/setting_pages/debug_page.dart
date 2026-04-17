@@ -16,6 +16,12 @@ class _DebugPage extends State<DebugPage> {
   ScrollController controller = ScrollController();
 
   @override
+  void dispose(){
+    controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     context.read<Global>().uiLogger.info("构建 DebugPage");
     return Scaffold(

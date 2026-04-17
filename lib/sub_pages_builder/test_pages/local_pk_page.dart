@@ -38,6 +38,13 @@ class _LocalPKSelectPage extends State<LocalPKSelectPage> {
   }
 
   @override
+  void dispose() {
+    connectpwdController.dispose();
+    scannerController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     context.read<Global>().uiLogger.info("构建局域网联机主页面");
     MediaQueryData mediaQuery = MediaQuery.of(context);
@@ -156,6 +163,12 @@ class _LocalPKPage extends State<LocalPKPage> {
   }
 
   @override
+  void dispose() {
+    pageController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     if(context.read<PKServer>().pageController == null) {
       context.read<PKServer>().setPageControler(pageController);
@@ -212,6 +225,7 @@ class _ServerHostWatingPage extends State<ServerHostWatingPage> {
   @override
   void dispose() {
     scannerController.dispose();
+    connectpwdController.dispose();
     super.dispose();
   }
 
@@ -522,6 +536,12 @@ class _PKOngoingPage extends State<PKOngoingPage> {
       choiceOptions.add(List.generate(4, (int index) => optionWords[index].chinese));
     }
     super.initState();
+  }
+
+  @override
+  void dispose() {
+    pageController.dispose();
+    super.dispose();
   }
 
   @override
