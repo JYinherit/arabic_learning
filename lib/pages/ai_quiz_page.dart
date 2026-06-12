@@ -1,5 +1,6 @@
 import 'package:arabic_learning/funcs/ai_service.dart';
 import 'package:arabic_learning/funcs/quiz_bank.dart';
+import 'package:arabic_learning/sub_pages_builder/test_pages/ai_chat_dialog.dart';
 import 'package:arabic_learning/vars/config_structure.dart' show WordItem;
 import 'package:arabic_learning/vars/statics_var.dart';
 import 'package:flutter/material.dart';
@@ -25,6 +26,10 @@ class _AiQuizPageState extends State<AiQuizPage> with TickerProviderStateMixin {
   int _currentIndex = 0;
   bool _loading = false;
   String? _errorMsg;
+  AiErrorType? _errorType;
+  String? _lastRawResponse;
+  String? _lastSystemPrompt;
+  String? _lastUserPrompt;
 
   bool _answered = false;
   bool? _correct;
@@ -69,7 +74,14 @@ class _AiQuizPageState extends State<AiQuizPage> with TickerProviderStateMixin {
       setState(() { _items = items; _currentIndex = 0; _resetAnswer(); _loading = false; });
     } on AiException catch (e) {
       if (!mounted) return;
-      setState(() { _loading = false; _errorMsg = e.userMessage; });
+      setState(() {
+        _loading = false;
+        _errorMsg = e.userMessage;
+        _errorType = e.type;
+        _lastRawResponse = e.rawResponse;
+        _lastSystemPrompt = e.systemPrompt;
+        _lastUserPrompt = e.userPrompt;
+      });
     }
   }
 
@@ -237,6 +249,10 @@ class _AiQuizPageState extends State<AiQuizPage> with TickerProviderStateMixin {
   }
 
   Widget _buildError(ThemeData theme) {
+    final bool canChat = _errorType == AiErrorType.parseError &&
+        _lastRawResponse != null &&
+        _lastSystemPrompt != null &&
+        _lastUserPrompt != null;
     return Center(child: Padding(padding: const EdgeInsets.all(32), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
       Icon(Icons.error_outline, size: 64, color: theme.colorScheme.error),
       const SizedBox(height: 16),
@@ -244,6 +260,44 @@ class _AiQuizPageState extends State<AiQuizPage> with TickerProviderStateMixin {
       const SizedBox(height: 32),
       ElevatedButton.icon(onPressed: _generate, icon: const Icon(Icons.refresh), label: const Text('重试'), style: ElevatedButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: StaticsVar.br))),
       const SizedBox(height: 12),
+      if (canChat)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: ElevatedButton.icon(
+            onPressed: () async {
+              final items = await Navigator.push<List<QuizItem>>(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => AiChatPage(
+                    word: widget.word,
+                    quizType: _selectedType,
+                    difficulty: _selectedDiff,
+                    errorMessage: _errorMsg!,
+                    rawResponse: _lastRawResponse!,
+                    systemPrompt: _lastSystemPrompt!,
+                    userPrompt: _lastUserPrompt!,
+                  ),
+                ),
+              );
+              if (items != null && items.isNotEmpty && mounted) {
+                setState(() {
+                  _items = items;
+                  _currentIndex = 0;
+                  _resetAnswer();
+                  _errorMsg = null;
+                  _errorType = null;
+                });
+              }
+            },
+            icon: const Icon(Icons.chat),
+            label: const Text('与 AI 沟通修正'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: theme.colorScheme.tertiaryContainer,
+              foregroundColor: theme.colorScheme.onTertiaryContainer,
+              shape: RoundedRectangleBorder(borderRadius: StaticsVar.br),
+            ),
+          ),
+        ),
       TextButton(onPressed: () => setState(() { _configuring = true; _errorMsg = null; }), child: const Text('返回选择')),
     ])));
   }

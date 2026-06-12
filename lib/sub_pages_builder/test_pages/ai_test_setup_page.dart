@@ -3,6 +3,7 @@ import 'package:arabic_learning/funcs/quiz_bank.dart';
 import 'package:arabic_learning/funcs/ui.dart';
 import 'package:arabic_learning/funcs/utili.dart';
 import 'package:arabic_learning/pages/ai_quiz_page.dart';
+import 'package:arabic_learning/sub_pages_builder/test_pages/ai_chat_dialog.dart';
 import 'package:arabic_learning/vars/config_structure.dart' show WordItem;
 import 'package:arabic_learning/vars/global.dart';
 import 'package:arabic_learning/vars/statics_var.dart';
@@ -271,6 +272,10 @@ class _MultiWordAiSessionState extends State<_MultiWordAiSession> {
   int _currentWordIndex = 0;
   bool _loading = false;
   String? _errorMsg;
+  AiErrorType? _errorType;
+  String? _lastRawResponse;
+  String? _lastSystemPrompt;
+  String? _lastUserPrompt;
   List<QuizItem>? _preloadedItems;
 
   @override
@@ -300,6 +305,10 @@ class _MultiWordAiSessionState extends State<_MultiWordAiSession> {
       if (!mounted) return;
       setState(() {
         _errorMsg = e.userMessage;
+        _errorType = e.type;
+        _lastRawResponse = e.rawResponse;
+        _lastSystemPrompt = e.systemPrompt;
+        _lastUserPrompt = e.userPrompt;
         _loading = false;
       });
     }
@@ -364,6 +373,10 @@ class _MultiWordAiSessionState extends State<_MultiWordAiSession> {
     }
 
     if (_errorMsg != null) {
+      final bool canChat = _errorType == AiErrorType.parseError &&
+          _lastRawResponse != null &&
+          _lastSystemPrompt != null &&
+          _lastUserPrompt != null;
       return Scaffold(
         appBar: AppBar(
             title: Text('AI 练习 (${_currentWordIndex + 1}/$total)')),
@@ -387,6 +400,43 @@ class _MultiWordAiSessionState extends State<_MultiWordAiSession> {
                   label: const Text('重试'),
                 ),
                 const SizedBox(height: 12),
+                if (canChat)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: ElevatedButton.icon(
+                      onPressed: () async {
+                        final items = await Navigator.push<List<QuizItem>>(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => AiChatPage(
+                              word: widget.words[_currentWordIndex],
+                              quizType: widget.quizType,
+                              difficulty: widget.difficulty,
+                              errorMessage: _errorMsg!,
+                              rawResponse: _lastRawResponse!,
+                              systemPrompt: _lastSystemPrompt!,
+                              userPrompt: _lastUserPrompt!,
+                            ),
+                          ),
+                        );
+                        if (items != null && items.isNotEmpty && mounted) {
+                          setState(() {
+                            _preloadedItems = items;
+                            _errorMsg = null;
+                            _errorType = null;
+                            _loading = false;
+                          });
+                        }
+                      },
+                      icon: const Icon(Icons.chat),
+                      label: const Text('与 AI 沟通修正'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: theme.colorScheme.tertiaryContainer,
+                        foregroundColor: theme.colorScheme.onTertiaryContainer,
+                        shape: RoundedRectangleBorder(borderRadius: StaticsVar.br),
+                      ),
+                    ),
+                  ),
                 TextButton(
                   onPressed: () => Navigator.pop(context),
                   child: const Text('返回'),

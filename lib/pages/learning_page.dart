@@ -10,6 +10,7 @@ import 'package:arabic_learning/vars/global.dart';
 import 'package:arabic_learning/vars/statics_var.dart';
 import 'package:arabic_learning/sub_pages_builder/learning_pages/fsrs_pages.dart' show FSRSLearningPage, ForeFSRSSettingPage;
 import 'package:arabic_learning/sub_pages_builder/learning_pages/learning_pages_build.dart';
+import 'package:arabic_learning/sub_pages_builder/learning_pages/verb_conjugation_page.dart';
 
 class LearningPage extends StatelessWidget {
   const LearningPage({super.key});
@@ -19,9 +20,10 @@ class LearningPage extends StatelessWidget {
     context.read<Global>().uiLogger.fine("构建 LearningPage");
     final mediaQuery = MediaQuery.of(context);
 
-    return Column(
-      children: [
-        SizedBox(height: mediaQuery.size.height * 0.05),
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          SizedBox(height: mediaQuery.size.height * 0.05),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
@@ -179,8 +181,30 @@ class LearningPage extends StatelessWidget {
           icon: Icon(Icons.abc, size: 24),
           label: Text("词汇总览", style: TextStyle(fontSize: 40.0)),
         ),
+        SizedBox(height: mediaQuery.size.height * 0.05),
+        ElevatedButton.icon(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Theme.of(context).colorScheme.onPrimary.withAlpha(150),
+            fixedSize: Size(mediaQuery.size.width * 0.8, mediaQuery.size.height * 0.15),
+            shape: RoundedRectangleBorder(borderRadius: StaticsVar.br),
+          ),
+          onPressed: () async {
+            final String? verb = await VerbInputDialog.show(context);
+            if (verb != null && context.mounted) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => VerbConjugationPage(verb: verb),
+                ),
+              );
+            }
+          },
+          icon: const Icon(Icons.search, size: 24),
+          label: const Text("动词变位查询", style: TextStyle(fontSize: 40.0)),
+        ),
+        SizedBox(height: mediaQuery.size.height * 0.1),
       ]
-    );
+    ));
   }
 }
 

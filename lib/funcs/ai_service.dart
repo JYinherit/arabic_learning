@@ -21,7 +21,12 @@ enum AiErrorType {
 class AiException implements Exception {
   final AiErrorType type;
   final String message;
-  const AiException(this.type, this.message);
+  final String? rawResponse;
+  final String? systemPrompt;
+  final String? userPrompt;
+
+  const AiException(this.type, this.message,
+      {this.rawResponse, this.systemPrompt, this.userPrompt});
 
   String get userMessage {
     switch (type) {
@@ -33,6 +38,17 @@ class AiException implements Exception {
       case AiErrorType.cancelled:   return '已取消';
       case AiErrorType.unknown:     return '未知错误：$message';
     }
+  }
+
+  AiException withContext({
+    String? rawResponse,
+    String? systemPrompt,
+    String? userPrompt,
+  }) {
+    return AiException(type, message,
+        rawResponse: rawResponse ?? this.rawResponse,
+        systemPrompt: systemPrompt ?? this.systemPrompt,
+        userPrompt: userPrompt ?? this.userPrompt);
   }
 
   @override
@@ -240,6 +256,109 @@ class AiService {
 
   void cancel() => _cancelToken?.cancel('user_cancel');
 
+  // ── 多轮对话：用于格式修正等需要与 AI 持续沟通的场景 ─────────────────────
+  Future<String> sendConversation({
+    required String systemPrompt,
+    required List<Map<String, String>> messages,
+  }) async {
+    final AiConfig cfg = AppData().config.ai;
+    final AiEndpoint endpoint = cfg.currentEndpoint;
+
+    if (endpoint.apiKey.trim().isEmpty && endpoint.mode != AiApiMode.webAutomation) {
+      throw const AiException(AiErrorType.noApiKey, 'API key is empty');
+    }
+
+    _cancelToken = CancelToken();
+
+    if (endpoint.mode == AiApiMode.geminiNative) {
+      return _callGeminiConversation(endpoint, systemPrompt, messages);
+    }
+
+    final List<Map<String, String>> fullMessages = [
+      {'role': 'system', 'content': systemPrompt},
+      ...messages,
+    ];
+
+    final Dio dio = Dio(BaseOptions(
+      baseUrl: endpoint.baseUrl.trimRight(),
+      connectTimeout: const Duration(seconds: 15),
+      receiveTimeout: const Duration(seconds: 90),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ${endpoint.apiKey}',
+      },
+    ));
+    try {
+      final Response<dynamic> response = await dio.post(
+        '/chat/completions',
+        data: {
+          'model': endpoint.model,
+          'temperature': 0.7,
+          'max_tokens': 2048,
+          'messages': fullMessages,
+        },
+        cancelToken: _cancelToken,
+      );
+      return _extractContent(response.data);
+    } on DioException catch (e) {
+      throw _mapDioError(e);
+    } catch (e) {
+      if (e is AiException) rethrow;
+      _logger.severe('sendConversation 未知错误: $e');
+      throw AiException(AiErrorType.unknown, e.toString());
+    }
+  }
+
+  Future<String> _callGeminiConversation(
+    AiEndpoint endpoint,
+    String systemPrompt,
+    List<Map<String, String>> messages,
+  ) async {
+    String baseUrl = endpoint.baseUrl.trimRight();
+    if (baseUrl.isEmpty) {
+      baseUrl = 'https://generativelanguage.googleapis.com';
+    }
+
+    final List<Map<String, dynamic>> contents = messages.map((m) {
+      final role = m['role'] == 'assistant' ? 'model' : 'user';
+      return {
+        'role': role,
+        'parts': [{'text': m['content']}],
+      };
+    }).toList();
+
+    final Dio dio = Dio(BaseOptions(
+      baseUrl: baseUrl,
+      connectTimeout: const Duration(seconds: 15),
+      receiveTimeout: const Duration(seconds: 90),
+      headers: {'Content-Type': 'application/json'},
+    ));
+
+    try {
+      final Response<dynamic> response = await dio.post(
+        '/v1beta/models/${endpoint.model}:generateContent?key=${endpoint.apiKey}',
+        data: {
+          'system_instruction': {
+            'parts': [{'text': systemPrompt}]
+          },
+          'contents': contents,
+          'generationConfig': {
+            'temperature': 0.7,
+            'maxOutputTokens': 2048,
+          },
+        },
+        cancelToken: _cancelToken,
+      );
+      return _extractGeminiContent(response.data);
+    } on DioException catch (e) {
+      throw _mapDioError(e);
+    } catch (e) {
+      if (e is AiException) rethrow;
+      _logger.severe('Gemini sendConversation 未知错误: $e');
+      throw AiException(AiErrorType.unknown, e.toString());
+    }
+  }
+
   // ── 主入口：按题型生成并存库 ──────────────────────────────────────────────
   Future<List<QuizItem>> generateAndSave({
     required WordItem word,
@@ -262,8 +381,12 @@ class AiService {
     final String raw = await _callApi(cfg, systemPrompt, userPrompt);
     _logger.fine('AI 原始响应（前200字符）: ${raw.substring(0, raw.length.clamp(0, 200))}');
 
-    final List<QuizItem> items =
-        _parseResponse(raw, word, quizType: quizType, difficulty: difficulty);
+    final List<QuizItem> items;
+    try {
+      items = _parseResponse(raw, word, quizType: quizType, difficulty: difficulty);
+    } on AiException catch (e) {
+      throw e.withContext(systemPrompt: systemPrompt, userPrompt: userPrompt);
+    }
     _logger.info('解析得到 ${items.length} 道题目');
 
     await QuizBank().addItems(items);
@@ -444,11 +567,13 @@ class AiService {
     }
     if (parsed == null) {
       _logger.severe('无法从以下内容解析 JSON:\n$raw');
-      throw const AiException(AiErrorType.parseError, 'Cannot extract valid JSON');
+      throw AiException(AiErrorType.parseError, 'Cannot extract valid JSON',
+          rawResponse: raw);
     }
     final List<dynamic> questions = parsed['questions'] as List<dynamic>? ?? [];
     if (questions.isEmpty) {
-      throw const AiException(AiErrorType.parseError, 'AI returned empty questions list');
+      throw AiException(AiErrorType.parseError, 'AI returned empty questions list',
+          rawResponse: raw);
     }
     return questions
         .asMap()

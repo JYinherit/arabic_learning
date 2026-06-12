@@ -58,6 +58,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   bk_tree: ^0.1.2
   wakelock_plus: ^1.5.1
+  webview_flutter: ^4.10.0
 
 dev_dependencies:
   flutter_test:
